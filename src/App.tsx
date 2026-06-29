@@ -48,6 +48,7 @@ const App = () => (
             <Route path="categorias" element={<AdminCategories />} />
             <Route path="pedidos" element={<AdminOrders />} />
             <Route path="logs" element={<AdminLogs />} />
+            <Route path="importar-imagens" element={<AdminImportImages />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />
