@@ -39,6 +39,58 @@ export default function AdminProducts() {
   const [form, setForm] = useState<ProductForm>(empty);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [bulkAi, setBulkAi] = useState(false);
+  const [bulkImg, setBulkImg] = useState(false);
+  const [rowBusy, setRowBusy] = useState<Record<string, "ai" | "img" | null>>({});
+
+  const callFn = async (name: string, body: any) => {
+    const { data, error } = await supabase.functions.invoke(name, { body });
+    if (error) throw error;
+    return data;
+  };
+
+  const bulkGenerateDescriptions = async () => {
+    if (!confirm("Gerar descrições com IA para todos os produtos sem descrição? Pode levar alguns minutos.")) return;
+    setBulkAi(true);
+    try {
+      const data = await callFn("generate-product-descriptions", {});
+      toast.success(`${data.updated} descrição(ões) gerada(s)`);
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkAi(false); }
+  };
+
+  const bulkFetchImages = async () => {
+    if (!confirm("Buscar imagens automaticamente para todos os produtos sem imagem? Pode levar vários minutos e a qualidade varia.")) return;
+    setBulkImg(true);
+    try {
+      const data = await callFn("fetch-product-images", {});
+      toast.success(`${data.updated} imagem(ns) vinculada(s)`);
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkImg(false); }
+  };
+
+  const regenDescription = async (id: string) => {
+    setRowBusy((s) => ({ ...s, [id]: "ai" }));
+    try {
+      await callFn("generate-product-descriptions", { product_ids: [id], overwrite: true });
+      toast.success("Descrição gerada");
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setRowBusy((s) => ({ ...s, [id]: null })); }
+  };
+
+  const fetchOneImage = async (id: string) => {
+    setRowBusy((s) => ({ ...s, [id]: "img" }));
+    try {
+      const data = await callFn("fetch-product-images", { product_ids: [id], overwrite: true });
+      if (data.updated > 0) toast.success("Imagem vinculada");
+      else toast.error(data.errors?.[0]?.error ?? "Não encontrei imagem");
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setRowBusy((s) => ({ ...s, [id]: null })); }
+  };
 
   const { data: products } = useQuery({
     queryKey: ["admin-products"],
