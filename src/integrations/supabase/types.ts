@@ -210,13 +210,44 @@ export type Database = {
           },
         ]
       }
+      product_costs: {
+        Row: {
+          cost_price: number
+          created_at: string
+          id: string
+          product_id: string
+          updated_at: string
+        }
+        Insert: {
+          cost_price?: number
+          created_at?: string
+          id?: string
+          product_id: string
+          updated_at?: string
+        }
+        Update: {
+          cost_price?: number
+          created_at?: string
+          id?: string
+          product_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_costs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean
           brand: string | null
           category_id: string | null
           code: string | null
-          cost_price: number
           created_at: string
           description: string | null
           featured: boolean
@@ -232,7 +263,6 @@ export type Database = {
           brand?: string | null
           category_id?: string | null
           code?: string | null
-          cost_price?: number
           created_at?: string
           description?: string | null
           featured?: boolean
@@ -248,7 +278,6 @@ export type Database = {
           brand?: string | null
           category_id?: string | null
           code?: string | null
-          cost_price?: number
           created_at?: string
           description?: string | null
           featured?: boolean
