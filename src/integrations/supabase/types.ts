@@ -216,6 +216,7 @@ export type Database = {
           brand: string | null
           category_id: string | null
           code: string | null
+          cost_price: number
           created_at: string
           description: string | null
           featured: boolean
@@ -231,6 +232,7 @@ export type Database = {
           brand?: string | null
           category_id?: string | null
           code?: string | null
+          cost_price?: number
           created_at?: string
           description?: string | null
           featured?: boolean
@@ -246,6 +248,7 @@ export type Database = {
           brand?: string | null
           category_id?: string | null
           code?: string | null
+          cost_price?: number
           created_at?: string
           description?: string | null
           featured?: boolean
