@@ -179,12 +179,22 @@ export default function AdminProducts() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">Produtos</h1>
           <p className="text-muted-foreground text-sm">Gerencie o catálogo</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo produto</Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={bulkFetchImages} disabled={bulkImg}>
+            {bulkImg ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ImageDown className="h-4 w-4 mr-1" />}
+            Buscar imagens
+          </Button>
+          <Button variant="outline" onClick={bulkGenerateDescriptions} disabled={bulkAi}>
+            {bulkAi ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+            Gerar descrições com IA
+          </Button>
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo produto</Button>
+        </div>
       </div>
 
       <Card>
