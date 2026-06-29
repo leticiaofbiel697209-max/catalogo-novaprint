@@ -219,6 +219,12 @@ export default function AdminProducts() {
                 <span className={`rounded-full px-2 py-0.5 text-xs ${p.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
                   {p.active ? "Ativo" : "Inativo"}
                 </span>
+                <Button size="icon" variant="ghost" title="Buscar imagem na web" onClick={() => fetchOneImage(p.id)} disabled={rowBusy[p.id] === "img"}>
+                  {rowBusy[p.id] === "img" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageDown className="h-4 w-4" />}
+                </Button>
+                <Button size="icon" variant="ghost" title="Gerar descrição com IA" onClick={() => regenDescription(p.id)} disabled={rowBusy[p.id] === "ai"}>
+                  {rowBusy[p.id] === "ai" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                </Button>
                 <Button size="icon" variant="ghost" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
               </div>
             ))}
