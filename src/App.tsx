@@ -19,6 +19,7 @@ import AdminProducts from "./pages/admin/AdminProducts";
 import AdminCategories from "./pages/admin/AdminCategories";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminLogs from "./pages/admin/AdminLogs";
+import AdminImportImages from "./pages/admin/AdminImportImages";
 
 import NotFound from "./pages/NotFound";
 
@@ -47,6 +48,7 @@ const App = () => (
             <Route path="categorias" element={<AdminCategories />} />
             <Route path="pedidos" element={<AdminOrders />} />
             <Route path="logs" element={<AdminLogs />} />
+            <Route path="importar-imagens" element={<AdminImportImages />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

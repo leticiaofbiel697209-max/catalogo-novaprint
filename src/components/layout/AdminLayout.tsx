@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LayoutDashboard, Package, Tags, ShoppingBag, FileText, LogOut, Printer } from "lucide-react";
+import { Loader2, LayoutDashboard, Package, Tags, ShoppingBag, FileText, LogOut, Printer, Images } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Session } from "@supabase/supabase-js";
 
@@ -61,6 +61,7 @@ export default function AdminLayout() {
     { to: "/admin/categorias", label: "Categorias", icon: Tags },
     { to: "/admin/pedidos", label: "Pedidos", icon: ShoppingBag },
     { to: "/admin/logs", label: "Logs", icon: FileText },
+    { to: "/admin/importar-imagens", label: "Importar imagens", icon: Images },
   ];
 
   return (

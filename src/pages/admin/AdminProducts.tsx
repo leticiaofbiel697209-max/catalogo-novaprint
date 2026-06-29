@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Upload, Loader2 } from "lucide-react";
+import { Plus, Pencil, Upload, Loader2, Sparkles, ImageDown } from "lucide-react";
 import { toast } from "sonner";
 import { formatBRL } from "@/lib/format";
 
@@ -39,6 +39,58 @@ export default function AdminProducts() {
   const [form, setForm] = useState<ProductForm>(empty);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [bulkAi, setBulkAi] = useState(false);
+  const [bulkImg, setBulkImg] = useState(false);
+  const [rowBusy, setRowBusy] = useState<Record<string, "ai" | "img" | null>>({});
+
+  const callFn = async (name: string, body: any) => {
+    const { data, error } = await supabase.functions.invoke(name, { body });
+    if (error) throw error;
+    return data;
+  };
+
+  const bulkGenerateDescriptions = async () => {
+    if (!confirm("Gerar descrições com IA para todos os produtos sem descrição? Pode levar alguns minutos.")) return;
+    setBulkAi(true);
+    try {
+      const data = await callFn("generate-product-descriptions", {});
+      toast.success(`${data.updated} descrição(ões) gerada(s)`);
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkAi(false); }
+  };
+
+  const bulkFetchImages = async () => {
+    if (!confirm("Buscar imagens automaticamente para todos os produtos sem imagem? Pode levar vários minutos e a qualidade varia.")) return;
+    setBulkImg(true);
+    try {
+      const data = await callFn("fetch-product-images", {});
+      toast.success(`${data.updated} imagem(ns) vinculada(s)`);
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setBulkImg(false); }
+  };
+
+  const regenDescription = async (id: string) => {
+    setRowBusy((s) => ({ ...s, [id]: "ai" }));
+    try {
+      await callFn("generate-product-descriptions", { product_ids: [id], overwrite: true });
+      toast.success("Descrição gerada");
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setRowBusy((s) => ({ ...s, [id]: null })); }
+  };
+
+  const fetchOneImage = async (id: string) => {
+    setRowBusy((s) => ({ ...s, [id]: "img" }));
+    try {
+      const data = await callFn("fetch-product-images", { product_ids: [id], overwrite: true });
+      if (data.updated > 0) toast.success("Imagem vinculada");
+      else toast.error(data.errors?.[0]?.error ?? "Não encontrei imagem");
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setRowBusy((s) => ({ ...s, [id]: null })); }
+  };
 
   const { data: products } = useQuery({
     queryKey: ["admin-products"],
@@ -127,12 +179,22 @@ export default function AdminProducts() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold">Produtos</h1>
           <p className="text-muted-foreground text-sm">Gerencie o catálogo</p>
         </div>
-        <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo produto</Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" onClick={bulkFetchImages} disabled={bulkImg}>
+            {bulkImg ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ImageDown className="h-4 w-4 mr-1" />}
+            Buscar imagens
+          </Button>
+          <Button variant="outline" onClick={bulkGenerateDescriptions} disabled={bulkAi}>
+            {bulkAi ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+            Gerar descrições com IA
+          </Button>
+          <Button onClick={openNew}><Plus className="h-4 w-4 mr-1" /> Novo produto</Button>
+        </div>
       </div>
 
       <Card>
@@ -157,6 +219,12 @@ export default function AdminProducts() {
                 <span className={`rounded-full px-2 py-0.5 text-xs ${p.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
                   {p.active ? "Ativo" : "Inativo"}
                 </span>
+                <Button size="icon" variant="ghost" title="Buscar imagem na web" onClick={() => fetchOneImage(p.id)} disabled={rowBusy[p.id] === "img"}>
+                  {rowBusy[p.id] === "img" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageDown className="h-4 w-4" />}
+                </Button>
+                <Button size="icon" variant="ghost" title="Gerar descrição com IA" onClick={() => regenDescription(p.id)} disabled={rowBusy[p.id] === "ai"}>
+                  {rowBusy[p.id] === "ai" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                </Button>
                 <Button size="icon" variant="ghost" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
               </div>
             ))}
