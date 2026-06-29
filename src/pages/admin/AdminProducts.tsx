@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Upload, Loader2 } from "lucide-react";
+import { Plus, Pencil, Upload, Loader2, Sparkles, ImageDown } from "lucide-react";
 import { toast } from "sonner";
 import { formatBRL } from "@/lib/format";
 
