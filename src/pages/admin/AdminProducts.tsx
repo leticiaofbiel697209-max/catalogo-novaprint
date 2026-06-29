@@ -21,6 +21,7 @@ interface ProductForm {
   category_id: string | null;
   description: string;
   price: string;
+  cost_price: string;
   stock: string;
   image_url: string;
   featured: boolean;
@@ -29,7 +30,7 @@ interface ProductForm {
 
 const empty: ProductForm = {
   name: "", code: "", brand: "", category_id: null, description: "",
-  price: "0", stock: "0", image_url: "", featured: false, active: true,
+  price: "0", cost_price: "0", stock: "0", image_url: "", featured: false, active: true,
 };
 
 export default function AdminProducts() {
@@ -42,7 +43,10 @@ export default function AdminProducts() {
   const { data: products } = useQuery({
     queryKey: ["admin-products"],
     queryFn: async () => {
-      const { data } = await supabase.from("products").select("*, categories(name)").order("created_at", { ascending: false });
+      const { data } = await supabase
+        .from("products")
+        .select("*, categories(name), product_costs(cost_price)")
+        .order("created_at", { ascending: false });
       return data ?? [];
     },
   });
@@ -57,10 +61,11 @@ export default function AdminProducts() {
 
   const openNew = () => { setForm(empty); setOpen(true); };
   const openEdit = (p: any) => {
+    const cost = p.product_costs?.cost_price ?? p.cost_price ?? 0;
     setForm({
       id: p.id, name: p.name, code: p.code ?? "", brand: p.brand ?? "",
       category_id: p.category_id, description: p.description ?? "",
-      price: String(p.price), stock: String(p.stock), image_url: p.image_url ?? "",
+      price: String(p.price), cost_price: String(cost), stock: String(p.stock), image_url: p.image_url ?? "",
       featured: p.featured, active: p.active,
     });
     setOpen(true);
@@ -98,10 +103,18 @@ export default function AdminProducts() {
         featured: form.featured,
         active: form.active,
       };
-      const { error } = form.id
-        ? await supabase.from("products").update(payload).eq("id", form.id)
-        : await supabase.from("products").insert(payload);
+      const { error, data } = form.id
+        ? await supabase.from("products").update(payload).eq("id", form.id).select("id").single()
+        : await supabase.from("products").insert(payload).select("id").single();
       if (error) throw error;
+      const productId = data?.id ?? form.id;
+      if (productId) {
+        const { error: costErr } = await supabase.from("product_costs").upsert(
+          { product_id: productId, cost_price: Number(form.cost_price) || 0 },
+          { onConflict: "product_id" }
+        );
+        if (costErr) throw costErr;
+      }
       toast.success(form.id ? "Produto atualizado" : "Produto criado");
       qc.invalidateQueries({ queryKey: ["admin-products"] });
       setOpen(false);
@@ -136,8 +149,9 @@ export default function AdminProducts() {
                     {p.code} • {p.brand} • {p.categories?.name ?? "Sem categoria"}
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right text-sm">
                   <div className="font-semibold text-primary">{formatBRL(p.price)}</div>
+                  <div className="text-xs text-muted-foreground">Custo: {formatBRL(p.product_costs?.cost_price ?? 0)}</div>
                   <div className="text-xs text-muted-foreground">Estoque: {p.stock}</div>
                 </div>
                 <span className={`rounded-full px-2 py-0.5 text-xs ${p.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
@@ -179,8 +193,12 @@ export default function AdminProducts() {
               </Select>
             </div>
             <div>
-              <Label>Preço (R$)</Label>
+              <Label>Preço de venda (R$)</Label>
               <Input type="number" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+            </div>
+            <div>
+              <Label>Preço de custo (R$)</Label>
+              <Input type="number" step="0.01" value={form.cost_price} onChange={(e) => setForm({ ...form, cost_price: e.target.value })} />
             </div>
             <div>
               <Label>Estoque</Label>
