@@ -61,6 +61,7 @@ export default function AdminLayout() {
     { to: "/admin/categorias", label: "Categorias", icon: Tags },
     { to: "/admin/pedidos", label: "Pedidos", icon: ShoppingBag },
     { to: "/admin/logs", label: "Logs", icon: FileText },
+    { to: "/admin/importar-imagens", label: "Importar imagens", icon: Images },
   ];
 
   return (
