@@ -1,0 +1,1 @@
+ALTER TABLE public.products ADD COLUMN cost_price numeric(12,2) NOT NULL DEFAULT 0;
