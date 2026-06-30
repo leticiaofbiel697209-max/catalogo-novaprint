@@ -1,42 +1,65 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
+import PublicLayout from "@/components/layout/PublicLayout";
+import Index from "./pages/Index";
+import Catalog from "./pages/Catalog";
+import ProductDetail from "./pages/ProductDetail";
+import Cart from "./pages/Cart";
+import Checkout from "./pages/Checkout";
+import OrderConfirmation from "./pages/OrderConfirmation";
+import Login from "./pages/Login";
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
+import AdminLogin from "./pages/admin/AdminLogin";
+import AdminLayout from "@/components/layout/AdminLayout";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminProducts from "./pages/admin/AdminProducts";
+import AdminCategories from "./pages/admin/AdminCategories";
+import AdminOrders from "./pages/admin/AdminOrders";
+import AdminLogs from "./pages/admin/AdminLogs";
+import AdminImportImages from "./pages/admin/AdminImportImages";
+import AdminImportProducts from "./pages/admin/AdminImportProducts";
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
+import NotFound from "./pages/NotFound";
 
-.card {
-  padding: 2em;
-}
+const queryClient = new QueryClient();
 
-.read-the-docs {
-  color: #888;
-}
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route element={<PublicLayout />}>
+            <Route path="/" element={<Index />} />
+            <Route path="/catalogo" element={<Catalog />} />
+            <Route path="/produto/:id" element={<ProductDetail />} />
+            <Route path="/carrinho" element={<Cart />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/pedido/:id" element={<OrderConfirmation />} />
+            <Route path="/login" element={<Login />} />
+          </Route>
+
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="produtos" element={<AdminProducts />} />
+            <Route path="categorias" element={<AdminCategories />} />
+            <Route path="pedidos" element={<AdminOrders />} />
+            <Route path="logs" element={<AdminLogs />} />
+            <Route path="importar-imagens" element={<AdminImportImages />} />
+            <Route path="importar-produtos" element={<AdminImportProducts />} />
+          </Route>
+
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
+
+export default App;
