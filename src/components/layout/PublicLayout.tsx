@@ -1,15 +1,32 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Printer, ShoppingCart, Search, Menu, X } from "lucide-react";
+import { Printer, ShoppingCart, Search, Menu, X, LogIn, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/store/cart";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 export default function PublicLayout() {
   const count = useCart((s) => s.count());
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUserEmail(session?.user?.email ?? null);
+    });
+    supabase.auth.getSession().then(({ data }) => setUserEmail(data.session?.user?.email ?? null));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success("Sessão encerrada");
+    navigate("/");
+  };
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault();
