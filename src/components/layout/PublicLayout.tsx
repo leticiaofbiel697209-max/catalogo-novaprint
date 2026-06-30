@@ -14,6 +14,8 @@ export default function PublicLayout() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const showPrices = usePriceVisibility((s) => s.showPrices);
+  const togglePrices = usePriceVisibility((s) => s.toggle);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
