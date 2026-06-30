@@ -11,6 +11,7 @@ import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderConfirmation from "./pages/OrderConfirmation";
+import Login from "./pages/Login";
 
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminLayout from "@/components/layout/AdminLayout";
