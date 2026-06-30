@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, Pencil, Upload, Loader2, Sparkles, ImageDown, FileSpreadsheet, Search, X } from "lucide-react";
 import { toast } from "sonner";
 import { formatBRL } from "@/lib/format";
-import { useMemo } from "react";
+
 
 
 interface ProductForm {
