@@ -427,10 +427,38 @@ export default function AdminProducts() {
         </div>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por nome, código ou marca..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-9"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="sm:w-64"><SelectValue placeholder="Todas as categorias" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as categorias</SelectItem>
+            {categories?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
       <Card>
         <CardContent className="p-0">
+          <div className="px-4 py-2 text-xs text-muted-foreground border-b">
+            {filteredProducts.length} produto(s)
+          </div>
           <div className="divide-y">
-            {products?.map((p: any) => (
+            {filteredProducts.map((p: any) => (
+
               <div key={p.id} className="flex items-center gap-4 p-4">
                 <div className="h-14 w-14 rounded bg-muted overflow-hidden flex-shrink-0">
                   {p.image_url && <img src={p.image_url} className="h-full w-full object-cover" alt="" />}
