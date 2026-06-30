@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatBRL } from "@/lib/format";
+import PriceDisplay from "@/components/PriceDisplay";
 import { ShoppingCart, Package } from "lucide-react";
 import { useCart } from "@/store/cart";
 import { toast } from "sonner";
+
 
 export interface ProductCardProps {
   product: {
@@ -57,7 +58,7 @@ export default function ProductCard({ product }: ProductCardProps) {
         </div>
         <div className="flex items-end justify-between">
           <div>
-            <div className="text-lg font-bold text-primary">{formatBRL(product.price)}</div>
+            <div className="text-lg font-bold text-primary"><PriceDisplay value={product.price} /></div>
             <div className="text-xs text-muted-foreground">Estoque: {product.stock}</div>
           </div>
           <Button size="sm" onClick={handleAdd} disabled={product.stock <= 0}>
