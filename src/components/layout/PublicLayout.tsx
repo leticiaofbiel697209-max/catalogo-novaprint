@@ -84,6 +84,17 @@ export default function PublicLayout() {
             </Button>
           )}
 
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={togglePrices}
+            title={showPrices ? "Ocultar preços" : "Mostrar preços"}
+            className="hidden md:flex"
+          >
+            {showPrices ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            <span className="hidden lg:inline ml-2">{showPrices ? "Ocultar preços" : "Mostrar preços"}</span>
+          </Button>
+
           <Button asChild variant="default" className="relative">
             <Link to="/carrinho">
               <ShoppingCart className="h-4 w-4" />
