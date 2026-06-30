@@ -94,8 +94,11 @@ export default function ProductDetail() {
               />
               <Button variant="ghost" size="icon" onClick={() => setQty((q) => q + 1)}><Plus className="h-4 w-4" /></Button>
             </div>
-            <Button onClick={handleAdd} disabled={data.stock <= 0} size="lg" className="flex-1">
-              <ShoppingCart className="h-4 w-4 mr-2" /> Adicionar ao carrinho
+            <Button onClick={() => addToCart(false)} variant="outline" disabled={data.stock <= 0} size="lg" className="flex-1">
+              <FileText className="h-4 w-4 mr-2" /> Adicionar ao orçamento
+            </Button>
+            <Button onClick={() => addToCart(true)} disabled={data.stock <= 0} size="lg" className="flex-1">
+              <ShoppingCart className="h-4 w-4 mr-2" /> Comprar agora
             </Button>
           </div>
         </div>
