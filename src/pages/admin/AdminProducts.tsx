@@ -501,9 +501,12 @@ export default function AdminProducts() {
                 <Button size="icon" variant="ghost" onClick={() => openEdit(p)}><Pencil className="h-4 w-4" /></Button>
               </div>
             ))}
-            {(!products || products.length === 0) && (
-              <div className="p-8 text-center text-muted-foreground">Nenhum produto cadastrado.</div>
+            {filteredProducts.length === 0 && (
+              <div className="p-8 text-center text-muted-foreground">
+                {products && products.length > 0 ? "Nenhum produto corresponde aos filtros." : "Nenhum produto cadastrado."}
+              </div>
             )}
+
           </div>
         </CardContent>
       </Card>
