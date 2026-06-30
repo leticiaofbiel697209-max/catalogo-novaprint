@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatBRL, formatCNPJ, formatPhone } from "@/lib/format";
+import PriceDisplay from "@/components/PriceDisplay";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -157,13 +158,13 @@ export default function Checkout() {
                 {items.map((i) => (
                   <div key={i.product_id} className="flex justify-between text-sm gap-2">
                     <span className="line-clamp-1">{i.quantity}× {i.name}</span>
-                    <span className="text-muted-foreground whitespace-nowrap">{formatBRL(i.price * i.quantity)}</span>
+                    <span className="text-muted-foreground whitespace-nowrap"><PriceDisplay value={i.price * i.quantity} /></span>
                   </div>
                 ))}
               </div>
               <div className="border-t pt-4 flex justify-between items-baseline">
                 <span className="font-medium">Total</span>
-                <span className="text-2xl font-bold text-primary">{formatBRL(total())}</span>
+                <span className="text-2xl font-bold text-primary"><PriceDisplay value={total()} /></span>
               </div>
               <Button type="submit" size="lg" className="w-full" disabled={submitting}>
                 {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

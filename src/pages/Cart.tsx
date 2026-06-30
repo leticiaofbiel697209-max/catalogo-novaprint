@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useCart } from "@/store/cart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import PriceDisplay from "@/components/PriceDisplay";
 import { formatBRL } from "@/lib/format";
 import { Trash2, Minus, Plus, ShoppingCart, ArrowRight, Package } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -34,7 +35,7 @@ export default function Cart() {
                 <div className="flex-1 min-w-0">
                   <Link to={`/produto/${i.product_id}`} className="font-medium hover:text-primary line-clamp-2">{i.name}</Link>
                   <div className="text-xs text-muted-foreground mt-0.5">{i.code}</div>
-                  <div className="text-sm text-muted-foreground">{formatBRL(i.price)} un.</div>
+                  <div className="text-sm text-muted-foreground"><PriceDisplay value={i.price} /> un.</div>
                 </div>
                 <div className="flex items-center border rounded-md">
                   <Button variant="ghost" size="icon" onClick={() => setQty(i.product_id, i.quantity - 1)}><Minus className="h-4 w-4" /></Button>
@@ -42,7 +43,7 @@ export default function Cart() {
                   <Button variant="ghost" size="icon" onClick={() => setQty(i.product_id, i.quantity + 1)}><Plus className="h-4 w-4" /></Button>
                 </div>
                 <div className="text-right w-24">
-                  <div className="font-bold text-primary">{formatBRL(i.price * i.quantity)}</div>
+                  <div className="font-bold text-primary"><PriceDisplay value={i.price * i.quantity} /></div>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => remove(i.product_id)}>
                   <Trash2 className="h-4 w-4 text-destructive" />
@@ -62,7 +63,7 @@ export default function Cart() {
               </div>
               <div className="border-t pt-4 flex justify-between items-baseline">
                 <span className="font-medium">Total</span>
-                <span className="text-2xl font-bold text-primary">{formatBRL(total())}</span>
+                <span className="text-2xl font-bold text-primary"><PriceDisplay value={total()} /></span>
               </div>
               <Button asChild size="lg" className="w-full">
                 <Link to="/checkout">Finalizar pedido <ArrowRight className="h-4 w-4 ml-1" /></Link>

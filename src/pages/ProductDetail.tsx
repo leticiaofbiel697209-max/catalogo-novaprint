@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import PriceDisplay from "@/components/PriceDisplay";
 import { formatBRL } from "@/lib/format";
 import { ArrowLeft, Minus, Plus, Package, ShoppingCart, FileText } from "lucide-react";
 import { useState } from "react";
@@ -76,7 +77,7 @@ export default function ProductDetail() {
             {data.code && <span className="font-mono">• {data.code}</span>}
           </div>
           <h1 className="text-3xl font-bold leading-tight">{data.name}</h1>
-          <div className="text-3xl font-bold text-primary">{formatBRL(data.price)}</div>
+          <div className="text-3xl font-bold text-primary"><PriceDisplay value={data.price} /></div>
           <div className="text-sm text-muted-foreground">
             {data.stock > 0 ? `${data.stock} unidade(s) em estoque` : "Sem estoque no momento"}
           </div>
