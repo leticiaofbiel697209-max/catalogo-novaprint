@@ -64,7 +64,24 @@ export default function PublicLayout() {
             </NavLink>
           </nav>
 
-          <Button asChild variant="default" className="relative ml-auto md:ml-0">
+          {userEmail ? (
+            <div className="hidden sm:flex items-center gap-1 text-sm text-muted-foreground">
+              <User className="h-4 w-4" />
+              <span className="max-w-[160px] truncate">{userEmail}</span>
+              <Button variant="ghost" size="sm" onClick={handleLogout} title="Sair">
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : (
+            <Button asChild variant="ghost" size="sm" className="ml-auto md:ml-0">
+              <Link to="/login">
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline ml-2">Entrar</span>
+              </Link>
+            </Button>
+          )}
+
+          <Button asChild variant="default" className="relative">
             <Link to="/carrinho">
               <ShoppingCart className="h-4 w-4" />
               <span className="hidden sm:inline ml-2">Carrinho</span>
