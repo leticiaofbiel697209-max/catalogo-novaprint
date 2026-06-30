@@ -46,6 +46,9 @@ export default function AdminProducts() {
   const [rowBusy, setRowBusy] = useState<Record<string, "ai" | "img" | null>>({});
   const [importingSheet, setImportingSheet] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+
 
   const callFn = async (name: string, body: any) => {
     const { data, error } = await supabase.functions.invoke(name, { body });
