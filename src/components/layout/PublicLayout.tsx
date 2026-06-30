@@ -1,8 +1,9 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Printer, ShoppingCart, Search, Menu, X, LogIn, LogOut, User } from "lucide-react";
+import { Printer, ShoppingCart, Search, Menu, X, LogIn, LogOut, User, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/store/cart";
+import { usePriceVisibility } from "@/store/priceVisibility";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
