@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatBRL, formatCNPJ, formatPhone } from "@/lib/format";
+import { formatCNPJ, formatPhone } from "@/lib/format";
 import PriceDisplay from "@/components/PriceDisplay";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";

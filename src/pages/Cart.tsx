@@ -3,7 +3,6 @@ import { useCart } from "@/store/cart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PriceDisplay from "@/components/PriceDisplay";
-import { formatBRL } from "@/lib/format";
 import { Trash2, Minus, Plus, ShoppingCart, ArrowRight, Package } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 

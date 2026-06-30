@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PriceDisplay from "@/components/PriceDisplay";
-import { formatBRL } from "@/lib/format";
 import { ArrowLeft, Minus, Plus, Package, ShoppingCart, FileText } from "lucide-react";
 import { useState } from "react";
 import { useCart } from "@/store/cart";
