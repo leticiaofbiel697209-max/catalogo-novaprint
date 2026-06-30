@@ -115,6 +115,21 @@ export default function AdminProducts() {
     },
   });
 
+  const filteredProducts = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (products ?? []).filter((p: any) => {
+      if (categoryFilter !== "all" && p.category_id !== categoryFilter) return false;
+      if (!q) return true;
+      return (
+        p.name?.toLowerCase().includes(q) ||
+        p.code?.toLowerCase().includes(q) ||
+        p.brand?.toLowerCase().includes(q) ||
+        p.categories?.name?.toLowerCase().includes(q)
+      );
+    });
+  }, [products, search, categoryFilter]);
+
+
   const { data: categories } = useQuery({
     queryKey: ["admin-categories"],
     queryFn: async () => {
