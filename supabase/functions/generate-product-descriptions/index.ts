@@ -1,11 +1,15 @@
 // Edge Function: generate-product-descriptions
-// Usa Lovable AI para gerar descrições de produtos (em massa ou individual).
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
 
 interface ReqBody {
-  product_ids?: string[]; // se vazio/omitido => todos sem descrição
-  overwrite?: boolean;     // se true, regenera mesmo quem já tem descrição
+  product_ids?: string[];
+  overwrite?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -89,6 +93,7 @@ Deno.serve(async (req) => {
         if (!aiRes.ok) {
           const txt = await aiRes.text();
           errors.push({ id: p.id, error: `AI ${aiRes.status}: ${txt.slice(0, 200)}` });
+          if (aiRes.status === 429 || aiRes.status === 402) break;
           continue;
         }
         const json = await aiRes.json();
