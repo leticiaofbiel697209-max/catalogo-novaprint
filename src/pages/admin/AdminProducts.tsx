@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Upload, Loader2, Sparkles, ImageDown } from "lucide-react";
+import { Plus, Pencil, Upload, Loader2, Sparkles, ImageDown, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { formatBRL } from "@/lib/format";
 
@@ -42,6 +42,8 @@ export default function AdminProducts() {
   const [bulkAi, setBulkAi] = useState(false);
   const [bulkImg, setBulkImg] = useState(false);
   const [rowBusy, setRowBusy] = useState<Record<string, "ai" | "img" | null>>({});
+  const [importingSheet, setImportingSheet] = useState(false);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
 
   const callFn = async (name: string, body: any) => {
     const { data, error } = await supabase.functions.invoke(name, { body });
@@ -53,10 +55,14 @@ export default function AdminProducts() {
     if (!confirm("Gerar descrições com IA para todos os produtos sem descrição? Pode levar alguns minutos.")) return;
     setBulkAi(true);
     try {
-      const data = await callFn("generate-product-descriptions", {});
-      toast.success(`${data.updated} descrição(ões) gerada(s)`);
+      const data = await callFn("generate-product-descriptions", { limit: 50 });
+      if (data.errors?.length) {
+        toast.error(`${data.updated} gerada(s). Erro: ${data.errors[0].error}`);
+      } else {
+        toast.success(`${data.updated} descrição(ões) gerada(s)`);
+      }
       qc.invalidateQueries({ queryKey: ["admin-products"] });
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) { toast.error(e.message ?? "Erro ao gerar descrições"); }
     finally { setBulkAi(false); }
   };
 
@@ -74,8 +80,9 @@ export default function AdminProducts() {
   const regenDescription = async (id: string) => {
     setRowBusy((s) => ({ ...s, [id]: "ai" }));
     try {
-      await callFn("generate-product-descriptions", { product_ids: [id], overwrite: true });
-      toast.success("Descrição gerada");
+      const data = await callFn("generate-product-descriptions", { product_ids: [id], overwrite: true });
+      if (data.errors?.length) toast.error(data.errors[0].error);
+      else toast.success("Descrição gerada");
       qc.invalidateQueries({ queryKey: ["admin-products"] });
     } catch (e: any) { toast.error(e.message); }
     finally { setRowBusy((s) => ({ ...s, [id]: null })); }
@@ -140,6 +147,213 @@ export default function AdminProducts() {
     }
   };
 
+
+  const normalizeHeader = (value: string) =>
+    value
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "");
+
+  const parseMoney = (value: unknown) => {
+    if (value === null || value === undefined) return 0;
+    const raw = String(value).trim();
+    if (!raw) return 0;
+    const cleaned = raw
+      .replace(/R\$/gi, "")
+      .replace(/\s/g, "")
+      .replace(/\./g, "")
+      .replace(",", ".")
+      .replace(/[^0-9.-]/g, "");
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const parseInteger = (value: unknown) => {
+    const n = parseMoney(value);
+    return Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0;
+  };
+
+  const parseCsvLine = (line: string, delimiter: string) => {
+    const cells: string[] = [];
+    let current = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const next = line[i + 1];
+
+      if (char === '"' && inQuotes && next === '"') {
+        current += '"';
+        i += 1;
+        continue;
+      }
+
+      if (char === '"') {
+        inQuotes = !inQuotes;
+        continue;
+      }
+
+      if (char === delimiter && !inQuotes) {
+        cells.push(current.trim());
+        current = "";
+        continue;
+      }
+
+      current += char;
+    }
+
+    cells.push(current.trim());
+    return cells;
+  };
+
+  const parseDelimitedText = (text: string) => {
+    const cleanText = text.replace(/^\uFEFF/, "");
+    const lines = cleanText.split(/\r?\n/).filter((line) => line.trim().length > 0);
+    if (lines.length < 2) return [];
+
+    const firstLine = lines[0];
+    const candidates = [";", ",", "\t"];
+    const delimiter = candidates
+      .map((candidate) => ({ candidate, count: firstLine.split(candidate).length }))
+      .sort((a, b) => b.count - a.count)[0].candidate;
+
+    return lines.map((line) => parseCsvLine(line, delimiter));
+  };
+
+  const parseHtmlTable = (text: string) => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, "text/html");
+    const rows = Array.from(doc.querySelectorAll("table tr"));
+    return rows
+      .map((row) => Array.from(row.querySelectorAll("th,td")).map((cell) => cell.textContent?.trim() ?? ""))
+      .filter((row) => row.some(Boolean));
+  };
+
+  const getCell = (row: Record<string, string>, aliases: string[]) => {
+    for (const alias of aliases) {
+      const key = normalizeHeader(alias);
+      if (row[key] !== undefined && String(row[key]).trim() !== "") return String(row[key]).trim();
+    }
+    return "";
+  };
+
+  const importGestaoClickSheet = async (file: File) => {
+    setImportingSheet(true);
+    try {
+      const text = await file.text();
+      const isHtml = /<table|<html|<tr|<td/i.test(text);
+      const rows = isHtml ? parseHtmlTable(text) : parseDelimitedText(text);
+
+      if (rows.length < 2) {
+        throw new Error("Não consegui ler a planilha. Exporte do GestãoClick em CSV ou Excel .xls/HTML e tente novamente.");
+      }
+
+      const headers = rows[0].map(normalizeHeader);
+      const records = rows.slice(1).map((cells) => {
+        const record: Record<string, string> = {};
+        headers.forEach((header, index) => { record[header] = cells[index] ?? ""; });
+        return record;
+      });
+
+      const categoryCache = new Map<string, string>();
+      (categories ?? []).forEach((category: any) => categoryCache.set(normalizeHeader(category.name), category.id));
+
+      let imported = 0;
+      let skipped = 0;
+      let costsUpdated = 0;
+
+      for (const record of records) {
+        const name = getCell(record, ["Nome", "Produto", "Descrição", "Descricao", "Nome do produto", "Produto/Serviço", "Produto Serviço"]);
+        const code = getCell(record, ["Código", "Codigo", "Cod", "SKU", "Referência", "Referencia", "ID", "Nº", "Numero"]);
+        const brand = getCell(record, ["Marca", "Fabricante"]);
+        const categoryName = getCell(record, ["Categoria", "Grupo", "Departamento", "Família", "Familia"]);
+        const description = getCell(record, ["Descrição detalhada", "Descricao detalhada", "Observação", "Observacao", "Detalhes"]);
+        const imageUrl = getCell(record, ["Imagem", "URL imagem", "Image URL", "Foto", "URL"]);
+        const price = parseMoney(getCell(record, ["Preço", "Preco", "Preço venda", "Preco venda", "Valor", "Valor venda", "Venda"]));
+        const costPrice = parseMoney(getCell(record, ["Custo", "Preço custo", "Preco custo", "Valor custo", "Custo médio", "Custo medio"]));
+        const stock = parseInteger(getCell(record, ["Estoque", "Saldo", "Quantidade", "Qtd", "Disponível", "Disponivel"]));
+
+        if (!name) {
+          skipped += 1;
+          continue;
+        }
+
+        let categoryId: string | null = null;
+        if (categoryName) {
+          const normalizedCategory = normalizeHeader(categoryName);
+          categoryId = categoryCache.get(normalizedCategory) ?? null;
+
+          if (!categoryId) {
+            const { data: newCategory, error: categoryError } = await supabase
+              .from("categories")
+              .insert({ name: categoryName })
+              .select("id")
+              .single();
+            if (categoryError) throw categoryError;
+            categoryId = newCategory.id;
+            categoryCache.set(normalizedCategory, categoryId);
+          }
+        }
+
+        const productPayload = {
+          name,
+          code: code || null,
+          brand: brand || null,
+          category_id: categoryId,
+          description: description || null,
+          price,
+          stock,
+          image_url: imageUrl || null,
+          active: true,
+        };
+
+        let productId: string | null = null;
+
+        if (code) {
+          const { data, error } = await supabase
+            .from("products")
+            .upsert(productPayload, { onConflict: "code" })
+            .select("id")
+            .single();
+          if (error) throw error;
+          productId = data.id;
+        } else {
+          const { data: existing } = await supabase
+            .from("products")
+            .select("id")
+            .eq("name", name)
+            .maybeSingle();
+
+          const { data, error } = existing?.id
+            ? await supabase.from("products").update(productPayload).eq("id", existing.id).select("id").single()
+            : await supabase.from("products").insert(productPayload).select("id").single();
+          if (error) throw error;
+          productId = data.id;
+        }
+
+        if (productId && costPrice > 0) {
+          const { error: costError } = await supabase
+            .from("product_costs")
+            .upsert({ product_id: productId, cost_price: costPrice }, { onConflict: "product_id" });
+          if (costError) throw costError;
+          costsUpdated += 1;
+        }
+
+        imported += 1;
+      }
+
+      toast.success(`${imported} produto(s) importado(s). ${costsUpdated} custo(s) atualizado(s). ${skipped} linha(s) ignorada(s).`);
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+      qc.invalidateQueries({ queryKey: ["admin-categories"] });
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao importar planilha");
+    } finally {
+      setImportingSheet(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     try {
@@ -185,6 +399,17 @@ export default function AdminProducts() {
           <p className="text-muted-foreground text-sm">Gerencie o catálogo</p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,.txt,.tsv,.xls,.html"
+            className="hidden"
+            onChange={(e) => e.target.files?.[0] && importGestaoClickSheet(e.target.files[0])}
+          />
+          <Button variant="outline" onClick={() => importInputRef.current?.click()} disabled={importingSheet}>
+            {importingSheet ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 mr-1" />}
+            Importar planilha
+          </Button>
           <Button variant="outline" onClick={bulkFetchImages} disabled={bulkImg}>
             {bulkImg ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ImageDown className="h-4 w-4 mr-1" />}
             Buscar imagens
