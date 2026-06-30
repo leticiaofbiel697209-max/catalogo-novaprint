@@ -1,42 +1,55 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
+import { Package, ShoppingBag, Inbox, AlertCircle } from "lucide-react";
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
+export default function AdminDashboard() {
+  const { data: stats } = useQuery({
+    queryKey: ["admin-stats"],
+    queryFn: async () => {
+      const [products, orders, recebidos, erros] = await Promise.all([
+        supabase.from("products").select("id", { count: "exact", head: true }).eq("active", true),
+        supabase.from("orders").select("id", { count: "exact", head: true }),
+        supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "recebido"),
+        supabase.from("orders").select("id", { count: "exact", head: true }).eq("status", "erro_integracao"),
+      ]);
+      return {
+        products: products.count ?? 0,
+        orders: orders.count ?? 0,
+        recebidos: recebidos.count ?? 0,
+        erros: erros.count ?? 0,
+      };
+    },
+  });
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
+  const cards = [
+    { label: "Produtos ativos", value: stats?.products ?? 0, icon: Package, color: "text-primary bg-primary/10" },
+    { label: "Total de pedidos", value: stats?.orders ?? 0, icon: ShoppingBag, color: "text-success bg-success/10" },
+    { label: "Pedidos recebidos", value: stats?.recebidos ?? 0, icon: Inbox, color: "text-warning bg-warning/10" },
+    { label: "Erros de integração", value: stats?.erros ?? 0, icon: AlertCircle, color: "text-destructive bg-destructive/10" },
+  ];
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground">Visão geral do portal</p>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {cards.map((c) => (
+          <Card key={c.label}>
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className={`grid h-12 w-12 place-items-center rounded-lg ${c.color}`}>
+                <c.icon className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="text-2xl font-bold">{c.value}</div>
+                <div className="text-xs text-muted-foreground">{c.label}</div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
 }

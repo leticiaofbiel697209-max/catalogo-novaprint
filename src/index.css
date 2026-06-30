@@ -1,85 +1,86 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent } from "@/components/ui/card";
+import { Printer, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
-@layer base {
-  :root {
-    /* NovaPrint design system */
-    --background: 210 20% 98%;
-    --foreground: 220 25% 12%;
+export default function AdminLogin() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [loading, setLoading] = useState(false);
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 25% 12%;
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) navigate("/admin", { replace: true });
+    });
+  }, [navigate]);
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 220 25% 12%;
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      if (mode === "signin") {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        toast.success("Bem-vindo!");
+        navigate("/admin", { replace: true });
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/admin` },
+        });
+        if (error) throw error;
+        toast.success("Conta criada. Solicite ao administrador para promovê-la a admin.");
+        setMode("signin");
+      }
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro de autenticação");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    /* Primary: deep corporate blue */
-    --primary: 218 85% 32%;
-    --primary-foreground: 0 0% 100%;
-    --primary-hover: 218 85% 26%;
-
-    /* Secondary: warm orange accent for CTAs */
-    --accent-brand: 24 95% 53%;
-    --accent-brand-foreground: 0 0% 100%;
-
-    --secondary: 218 30% 95%;
-    --secondary-foreground: 218 85% 22%;
-
-    --muted: 218 20% 95%;
-    --muted-foreground: 220 12% 45%;
-
-    --accent: 218 30% 94%;
-    --accent-foreground: 218 85% 28%;
-
-    --success: 142 65% 38%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 220 25% 12%;
-    --destructive: 0 75% 50%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 220 15% 88%;
-    --input: 220 15% 88%;
-    --ring: 218 85% 32%;
-
-    --radius: 0.75rem;
-
-    --shadow-sm: 0 1px 2px hsl(220 25% 12% / 0.04);
-    --shadow-md: 0 4px 14px hsl(220 25% 12% / 0.08);
-    --shadow-lg: 0 16px 40px hsl(218 85% 32% / 0.15);
-
-    --gradient-hero: linear-gradient(135deg, hsl(218 85% 32%) 0%, hsl(218 85% 22%) 50%, hsl(218 90% 18%) 100%);
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(218 30% 98%) 100%);
-
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 220 25% 12%;
-    --sidebar-primary: 218 85% 32%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 218 30% 95%;
-    --sidebar-accent-foreground: 218 85% 22%;
-    --sidebar-border: 220 15% 88%;
-    --sidebar-ring: 218 85% 32%;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  }
-
-  h1, h2, h3, h4 {
-    @apply font-semibold tracking-tight text-foreground;
-  }
-}
-
-@layer components {
-  .container-page {
-    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
-  }
+  return (
+    <div className="min-h-screen grid place-items-center p-4" style={{ background: "var(--gradient-hero)" }}>
+      <Card className="w-full max-w-md">
+        <CardContent className="p-8 space-y-5">
+          <div className="text-center space-y-2">
+            <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
+              <Printer className="h-6 w-6" />
+            </div>
+            <h1 className="text-2xl font-bold">Painel NovaPrint</h1>
+            <p className="text-sm text-muted-foreground">Acesso restrito à equipe</p>
+          </div>
+          <form onSubmit={submit} className="space-y-4">
+            <div>
+              <Label htmlFor="email">E-mail</Label>
+              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="password">Senha</Label>
+              <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <Button className="w-full" disabled={loading}>
+              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {mode === "signin" ? "Entrar" : "Criar conta"}
+            </Button>
+          </form>
+          <button
+            type="button"
+            onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
+            className="text-sm text-primary hover:underline w-full text-center"
+          >
+            {mode === "signin" ? "Criar uma conta" : "Já tenho conta"}
+          </button>
+        </CardContent>
+      </Card>
+    </div>
+  );
 }
