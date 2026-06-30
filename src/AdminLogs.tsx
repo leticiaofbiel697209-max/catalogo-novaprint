@@ -1,120 +1,127 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { Printer } from "lucide-react";
+import ProductCard from "@/components/ProductCard";
+import { ArrowRight, Search, Truck, Shield, Headphones } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-/**
- * Login do cliente.
- *
- * Hoje autentica via Supabase Auth (e-mail/senha + cadastro).
- * Está preparado para no futuro validar/criar o cliente também na API do
- * GestãoClick — ver função `syncWithGestaoClick` abaixo. Basta criar uma
- * edge function `gestaoclick-auth` e ligar aqui.
- */
-export default function Login() {
+const Index = () => {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [q, setQ] = useState("");
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate("/");
-    });
-  }, [navigate]);
+  const { data: categories } = useQuery({
+    queryKey: ["home-categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("categories").select("*").eq("active", true).order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
 
-  // TODO: integrar com a API do GestãoClick quando o token estiver disponível.
-  // async function syncWithGestaoClick(payload: { email: string; name?: string }) {
-  //   await supabase.functions.invoke("gestaoclick-auth", { body: payload });
-  // }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        toast.success("Bem-vindo!");
-        navigate("/");
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-            data: { name },
-          },
-        });
-        if (error) throw error;
-        // await syncWithGestaoClick({ email, name });
-        toast.success("Cadastro realizado! Você já pode entrar.");
-        setMode("signin");
-      }
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { data: featured } = useQuery({
+    queryKey: ["home-featured"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("active", true)
+        .eq("featured", true)
+        .limit(8);
+      if (error) throw error;
+      return data;
+    },
+  });
 
   return (
-    <div className="container-page py-10 max-w-md">
-      <Card>
-        <CardHeader className="text-center">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-xl bg-primary text-primary-foreground">
-            <Printer className="h-6 w-6" />
-          </div>
-          <CardTitle>{mode === "signin" ? "Entrar" : "Criar conta"}</CardTitle>
-          <CardDescription>
-            {mode === "signin"
-              ? "Acesse para acompanhar seus pedidos"
-              : "Cadastre-se para agilizar seus próximos orçamentos"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === "signup" && (
-              <div className="space-y-1">
-                <Label htmlFor="name">Nome</Label>
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
+    <>
+      <section className="relative overflow-hidden text-primary-foreground" style={{ background: "var(--gradient-hero)" }}>
+        <div className="container-page py-16 md:py-24 grid md:grid-cols-2 gap-10 items-center">
+          <div className="space-y-6">
+            <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-wider backdrop-blur">
+              Portal de Pedidos NovaPrint
+            </span>
+            <h1 className="sr-only">Portal de Pedidos NovaPrint</h1>
+            <p className="text-lg text-white/80 max-w-lg">
+              Toners, cartuchos, papéis e suprimentos com agilidade. Navegue pelo catálogo, monte seu carrinho e envie sua solicitação — nossa equipe retorna com o orçamento.
+            </p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                navigate(`/catalogo${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+              }}
+              className="flex max-w-md gap-2"
+            >
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Buscar produto..."
+                  className="pl-9 bg-white text-foreground"
+                />
               </div>
-            )}
-            <div className="space-y-1">
-              <Label htmlFor="email">E-mail</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Button type="submit" variant="secondary" className="bg-accent-brand text-accent-brand-foreground hover:bg-accent-brand/90 border-0">
+                Buscar
+              </Button>
+            </form>
+            <div className="flex flex-wrap gap-6 pt-2 text-sm text-white/80">
+              <span className="flex items-center gap-2"><Truck className="h-4 w-4" /> Entrega rápida</span>
+              <span className="flex items-center gap-2"><Shield className="h-4 w-4" /> Produtos originais</span>
+              <span className="flex items-center gap-2"><Headphones className="h-4 w-4" /> Atendimento dedicado</span>
             </div>
-            <div className="space-y-1">
-              <Label htmlFor="password">Senha</Label>
-              <Input id="password" type="password" minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+          <div className="hidden md:block">
+            <div className="aspect-square rounded-2xl bg-white/10 backdrop-blur border border-white/20 p-8 grid place-items-center">
+              <div className="text-center">
+                <div className="text-7xl font-black">NP</div>
+                <div className="mt-2 text-sm text-white/70">Suprimentos & Impressão</div>
+              </div>
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Aguarde..." : mode === "signin" ? "Entrar" : "Cadastrar"}
-            </Button>
-          </form>
-          <div className="mt-4 text-center text-sm">
-            {mode === "signin" ? (
-              <button className="text-primary hover:underline" onClick={() => setMode("signup")}>
-                Não tem conta? Cadastre-se
-              </button>
-            ) : (
-              <button className="text-primary hover:underline" onClick={() => setMode("signin")}>
-                Já tem conta? Entrar
-              </button>
-            )}
           </div>
-          <div className="mt-4 text-center text-xs text-muted-foreground">
-            <Link to="/" className="hover:text-primary">Voltar à loja</Link>
+        </div>
+      </section>
+
+      <section className="container-page py-12 md:py-16">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold">Categorias</h2>
+            <p className="text-muted-foreground">Encontre o que precisa rapidamente</p>
           </div>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {categories?.map((c) => (
+            <Link
+              key={c.id}
+              to={`/catalogo?categoria=${c.id}`}
+              className="rounded-xl border bg-card p-4 text-center hover:border-primary hover:shadow-[var(--shadow-md)] transition-all"
+            >
+              <div className="text-sm font-medium">{c.name}</div>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="container-page pb-16">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold">Produtos em destaque</h2>
+            <p className="text-muted-foreground">Os mais pedidos da NovaPrint</p>
+          </div>
+          <Button asChild variant="ghost">
+            <Link to="/catalogo">Ver catálogo <ArrowRight className="h-4 w-4 ml-1" /></Link>
+          </Button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {featured?.map((p) => (
+            <ProductCard key={p.id} product={p as any} />
+          ))}
+        </div>
+      </section>
+    </>
   );
-}
+};
+
+export default Index;

@@ -1,108 +1,53 @@
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { formatBRL } from "@/lib/format";
-import { ArrowLeft, Minus, Plus, Package, ShoppingCart, FileText } from "lucide-react";
-import { useState } from "react";
-import { useCart } from "@/store/cart";
-import { toast } from "sonner";
+import { Card, CardContent } from "@/components/ui/card";
+import { CheckCircle2 } from "lucide-react";
+import { statusLabel } from "@/lib/format";
 
-export default function ProductDetail() {
+export default function OrderConfirmation() {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const add = useCart((s) => s.add);
-  const [qty, setQty] = useState(1);
-
   const { data, isLoading } = useQuery({
-    queryKey: ["product", id],
+    queryKey: ["order-public", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
-        .select("*, categories(name)")
-        .eq("id", id!)
-        .eq("active", true)
-        .maybeSingle();
-      if (error) throw error;
+      // Inserts are public, but SELECT requires admin. We can only read order_number from the URL of recent state.
+      // Fallback: read what we can — likely fails for SELECT. Use the insert response stored client-side instead.
+      const { data } = await supabase.from("orders").select("id, order_number, status").eq("id", id!).maybeSingle();
       return data;
     },
   });
 
-  if (isLoading) return <div className="container-page py-10">Carregando...</div>;
-  if (!data) {
-    return (
-      <div className="container-page py-16 text-center">
-        <p className="text-lg">Produto não encontrado.</p>
-        <Button asChild className="mt-4"><Link to="/catalogo">Voltar ao catálogo</Link></Button>
-      </div>
-    );
-  }
-
-  const addToCart = (redirect: boolean) => {
-    add({
-      product_id: data.id,
-      name: data.name,
-      code: data.code,
-      price: Number(data.price),
-      image_url: data.image_url,
-      stock: data.stock,
-    }, qty);
-    if (redirect) {
-      toast.success("Adicionado ao carrinho");
-      navigate("/carrinho");
-    } else {
-      toast.success("Adicionado ao orçamento");
-    }
-  };
-
   return (
-    <div className="container-page py-8">
-      <Button asChild variant="ghost" size="sm" className="mb-4">
-        <Link to="/catalogo"><ArrowLeft className="h-4 w-4 mr-1" /> Voltar</Link>
-      </Button>
-      <div className="grid md:grid-cols-2 gap-8">
-        <div className="aspect-square rounded-2xl overflow-hidden bg-muted border">
-          {data.image_url ? (
-            <img src={data.image_url} alt={data.name} className="h-full w-full object-cover" />
-          ) : (
-            <div className="h-full w-full grid place-items-center text-muted-foreground"><Package className="h-16 w-16" /></div>
-          )}
-        </div>
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            {data.categories?.name && <span className="rounded-full bg-secondary px-2 py-0.5">{data.categories.name}</span>}
-            {data.brand && <span>{data.brand}</span>}
-            {data.code && <span className="font-mono">• {data.code}</span>}
+    <div className="container-page py-16">
+      <Card className="max-w-xl mx-auto">
+        <CardContent className="p-8 text-center space-y-4">
+          <div className="grid place-items-center">
+            <CheckCircle2 className="h-16 w-16 text-success" />
           </div>
-          <h1 className="text-3xl font-bold leading-tight">{data.name}</h1>
-          <div className="text-3xl font-bold text-primary">{formatBRL(data.price)}</div>
-          <div className="text-sm text-muted-foreground">
-            {data.stock > 0 ? `${data.stock} unidade(s) em estoque` : "Sem estoque no momento"}
-          </div>
-          {data.description && <p className="text-foreground/80 leading-relaxed pt-2">{data.description}</p>}
-
-          <div className="flex items-center gap-3 pt-4">
-            <div className="flex items-center border rounded-md">
-              <Button variant="ghost" size="icon" onClick={() => setQty((q) => Math.max(1, q - 1))}><Minus className="h-4 w-4" /></Button>
-              <Input
-                type="number"
-                value={qty}
-                min={1}
-                onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
-                className="w-16 border-0 text-center"
-              />
-              <Button variant="ghost" size="icon" onClick={() => setQty((q) => q + 1)}><Plus className="h-4 w-4" /></Button>
+          <h1 className="text-2xl font-bold">Pedido enviado com sucesso!</h1>
+          <p className="text-muted-foreground">
+            Recebemos sua solicitação. A equipe NovaPrint irá analisar e retornar em breve com o orçamento ou confirmação.
+          </p>
+          {isLoading ? (
+            <div className="h-16" />
+          ) : data ? (
+            <div className="rounded-lg bg-secondary/60 p-4 inline-block">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider">Número do pedido</div>
+              <div className="text-2xl font-bold text-primary">#{data.order_number}</div>
+              <div className="text-sm mt-1">Status: <span className="font-medium">{statusLabel[data.status] ?? data.status}</span></div>
             </div>
-            <Button onClick={() => addToCart(false)} variant="outline" disabled={data.stock <= 0} size="lg" className="flex-1">
-              <FileText className="h-4 w-4 mr-2" /> Adicionar ao orçamento
-            </Button>
-            <Button onClick={() => addToCart(true)} disabled={data.stock <= 0} size="lg" className="flex-1">
-              <ShoppingCart className="h-4 w-4 mr-2" /> Comprar agora
-            </Button>
+          ) : (
+            <div className="rounded-lg bg-secondary/60 p-4 inline-block">
+              <div className="text-sm">Protocolo: <span className="font-mono">{id?.slice(0, 8)}</span></div>
+              <div className="text-sm">Status: Recebido</div>
+            </div>
+          )}
+          <div className="pt-4">
+            <Button asChild><Link to="/catalogo">Voltar ao catálogo</Link></Button>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

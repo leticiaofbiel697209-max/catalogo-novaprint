@@ -1,181 +1,106 @@
-import { useCart } from "@/store/cart";
-import { useNavigate } from "react-router-dom";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import { formatBRL, formatCNPJ, formatPhone } from "@/lib/format";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
-import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import ProductCard from "@/components/ProductCard";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, Package } from "lucide-react";
+import { useState, useEffect } from "react";
 
-const schema = z.object({
-  name: z.string().trim().min(1, "Informe seu nome").max(120),
-  company: z.string().trim().min(1, "Informe a empresa").max(160),
-  cnpj: z.string().max(20).optional().or(z.literal("")),
-  phone: z.string().max(20).optional().or(z.literal("")),
-  email: z.string().email("E-mail inválido").max(160).optional().or(z.literal("")),
-  notes: z.string().max(1000).optional().or(z.literal("")),
-}).refine((d) => (d.phone && d.phone.trim().length > 0) || (d.email && d.email.trim().length > 0), {
-  message: "Informe telefone ou e-mail",
-  path: ["phone"],
-});
+export default function Catalog() {
+  const [params, setParams] = useSearchParams();
+  const [q, setQ] = useState(params.get("q") ?? "");
+  const categoryId = params.get("categoria");
 
-type FormValues = z.infer<typeof schema>;
+  useEffect(() => setQ(params.get("q") ?? ""), [params]);
 
-export default function Checkout() {
-  const navigate = useNavigate();
-  const { items, total, clear } = useCart();
-  const [submitting, setSubmitting] = useState(false);
-
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormValues>({
-    resolver: zodResolver(schema),
-    defaultValues: { name: "", company: "", cnpj: "", phone: "", email: "", notes: "" },
+  const { data: categories } = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const { data } = await supabase.from("categories").select("*").eq("active", true).order("name");
+      return data ?? [];
+    },
   });
 
-  if (items.length === 0) {
-    return (
-      <div className="container-page py-16 text-center">
-        <p>Seu carrinho está vazio.</p>
-        <Button className="mt-4" onClick={() => navigate("/catalogo")}>Ir ao catálogo</Button>
-      </div>
-    );
-  }
+  const { data: products, isLoading } = useQuery({
+    queryKey: ["products", q, categoryId],
+    queryFn: async () => {
+      let query = supabase.from("products").select("*").eq("active", true).order("name");
+      if (categoryId) query = query.eq("category_id", categoryId);
+      if (q) query = query.or(`name.ilike.%${q}%,code.ilike.%${q}%,brand.ilike.%${q}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
+    },
+  });
 
-  const onSubmit = async (values: FormValues) => {
-    setSubmitting(true);
-    try {
-      const { data: customer, error: cErr } = await supabase
-        .from("customers")
-        .insert({
-          name: values.name,
-          company: values.company,
-          cnpj: values.cnpj || null,
-          phone: values.phone || null,
-          email: values.email || null,
-        })
-        .select()
-        .single();
-      if (cErr) throw cErr;
-
-      const totalValue = total();
-      const { data: order, error: oErr } = await supabase
-        .from("orders")
-        .insert({
-          customer_id: customer.id,
-          total_value: totalValue,
-          status: "recebido",
-          notes: values.notes || null,
-        })
-        .select()
-        .single();
-      if (oErr) throw oErr;
-
-      const orderItems = items.map((i) => ({
-        order_id: order.id,
-        product_id: i.product_id,
-        product_name: i.name,
-        product_code: i.code,
-        quantity: i.quantity,
-        unit_price: i.price,
-        total_price: i.price * i.quantity,
-      }));
-      const { error: iErr } = await supabase.from("order_items").insert(orderItems);
-      if (iErr) throw iErr;
-
-      clear();
-      navigate(`/pedido/${order.id}`);
-    } catch (e: any) {
-      console.error(e);
-      toast.error(e.message ?? "Erro ao enviar pedido");
-    } finally {
-      setSubmitting(false);
-    }
+  const updateParam = (key: string, value: string | null) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next);
   };
 
   return (
     <div className="container-page py-8">
-      <h1 className="text-3xl font-bold mb-6">Finalizar pedido</h1>
-      <form onSubmit={handleSubmit(onSubmit)} className="grid lg:grid-cols-[1fr_360px] gap-6">
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            <h2 className="font-semibold text-lg">Seus dados</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Nome *</Label>
-                <Input id="name" {...register("name")} />
-                {errors.name && <p className="text-xs text-destructive mt-1">{errors.name.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="company">Empresa *</Label>
-                <Input id="company" {...register("company")} />
-                {errors.company && <p className="text-xs text-destructive mt-1">{errors.company.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="cnpj">CNPJ</Label>
-                <Input
-                  id="cnpj"
-                  value={watch("cnpj") ?? ""}
-                  onChange={(e) => setValue("cnpj", formatCNPJ(e.target.value))}
-                  placeholder="00.000.000/0000-00"
-                />
-              </div>
-              <div>
-                <Label htmlFor="phone">Telefone</Label>
-                <Input
-                  id="phone"
-                  value={watch("phone") ?? ""}
-                  onChange={(e) => setValue("phone", formatPhone(e.target.value))}
-                  placeholder="(00) 00000-0000"
-                />
-                {errors.phone && <p className="text-xs text-destructive mt-1">{errors.phone.message}</p>}
-              </div>
-              <div className="sm:col-span-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input id="email" type="email" {...register("email")} placeholder="seu@email.com" />
-                {errors.email && <p className="text-xs text-destructive mt-1">{errors.email.message}</p>}
-              </div>
-              <div className="sm:col-span-2">
-                <Label htmlFor="notes">Observações</Label>
-                <Textarea id="notes" rows={4} {...register("notes")} placeholder="Detalhes do pedido, prazo desejado, etc." />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground">* Telefone ou e-mail é obrigatório para retorno.</p>
-          </CardContent>
-        </Card>
+      <h1 className="text-3xl font-bold mb-2">Catálogo</h1>
+      <p className="text-muted-foreground mb-6">Explore todos os produtos disponíveis</p>
 
-        <aside>
-          <Card className="sticky top-20">
-            <CardContent className="p-6 space-y-4">
-              <h2 className="font-semibold text-lg">Resumo do pedido</h2>
-              <div className="space-y-2 max-h-72 overflow-auto">
-                {items.map((i) => (
-                  <div key={i.product_id} className="flex justify-between text-sm gap-2">
-                    <span className="line-clamp-1">{i.quantity}× {i.name}</span>
-                    <span className="text-muted-foreground whitespace-nowrap">{formatBRL(i.price * i.quantity)}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="border-t pt-4 flex justify-between items-baseline">
-                <span className="font-medium">Total</span>
-                <span className="text-2xl font-bold text-primary">{formatBRL(total())}</span>
-              </div>
-              <Button type="submit" size="lg" className="w-full" disabled={submitting}>
-                {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Enviar pedido
-              </Button>
-              <p className="text-xs text-muted-foreground text-center">
-                Sua solicitação será analisada pela equipe NovaPrint.
-              </p>
-            </CardContent>
-          </Card>
+      <div className="grid md:grid-cols-[240px_1fr] gap-6">
+        <aside className="space-y-4">
+          <div>
+            <h3 className="text-sm font-semibold mb-2">Buscar</h3>
+            <form onSubmit={(e) => { e.preventDefault(); updateParam("q", q); }} className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nome, código, marca..." className="pl-9" />
+            </form>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold mb-2">Categorias</h3>
+            <div className="space-y-1">
+              <button
+                onClick={() => updateParam("categoria", null)}
+                className={`w-full text-left rounded-md px-3 py-2 text-sm ${!categoryId ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+              >
+                Todas
+              </button>
+              {categories?.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => updateParam("categoria", c.id)}
+                  className={`w-full text-left rounded-md px-3 py-2 text-sm ${categoryId === c.id ? "bg-primary text-primary-foreground" : "hover:bg-accent"}`}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
+          </div>
         </aside>
-      </form>
+
+        <section>
+          {isLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="aspect-[4/5] rounded-xl bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : products && products.length > 0 ? (
+            <>
+              <div className="text-sm text-muted-foreground mb-3">{products.length} produto(s)</div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {products.map((p) => <ProductCard key={p.id} product={p as any} />)}
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed p-12 text-center">
+              <Package className="mx-auto h-10 w-10 text-muted-foreground mb-3" />
+              <p className="font-medium">Nenhum produto encontrado</p>
+              <p className="text-sm text-muted-foreground">Tente outra busca ou categoria.</p>
+              <Button variant="outline" className="mt-4" onClick={() => setParams({})}>Limpar filtros</Button>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

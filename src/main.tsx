@@ -1,38 +1,85 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent } from "@/components/ui/card";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-export default function AdminLogs() {
-  const { data: logs } = useQuery({
-    queryKey: ["admin-logs"],
-    queryFn: async () => {
-      const { data } = await supabase.from("integration_logs").select("*").order("created_at", { ascending: false }).limit(200);
-      return data ?? [];
-    },
-  });
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Logs de integração</h1>
-        <p className="text-muted-foreground text-sm">Histórico de envios ao GestãoClick</p>
-      </div>
-      <Card>
-        <CardContent className="p-0 divide-y">
-          {logs?.map((l: any) => (
-            <details key={l.id} className="p-4">
-              <summary className="cursor-pointer flex items-center gap-3 text-sm">
-                <span className={`rounded-full px-2 py-0.5 text-xs ${l.status === "sucesso" ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"}`}>{l.status}</span>
-                <span className="font-medium">{l.action}</span>
-                <span className="text-muted-foreground">• {l.service}</span>
-                <span className="ml-auto text-xs text-muted-foreground">{new Date(l.created_at).toLocaleString("pt-BR")}</span>
-              </summary>
-              {l.error_message && <div className="mt-2 text-sm text-destructive">{l.error_message}</div>}
-              <pre className="mt-2 text-xs bg-muted p-3 rounded overflow-auto max-h-60">{JSON.stringify(l.response_payload ?? l.request_payload, null, 2)}</pre>
-            </details>
-          ))}
-          {(!logs || logs.length === 0) && <div className="p-8 text-center text-muted-foreground">Nenhum log ainda.</div>}
-        </CardContent>
-      </Card>
-    </div>
-  );
+@layer base {
+  :root {
+    /* NovaPrint design system */
+    --background: 210 20% 98%;
+    --foreground: 220 25% 12%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 25% 12%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 25% 12%;
+
+    /* Primary: deep corporate blue */
+    --primary: 218 85% 32%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 218 85% 26%;
+
+    /* Secondary: warm orange accent for CTAs */
+    --accent-brand: 24 95% 53%;
+    --accent-brand-foreground: 0 0% 100%;
+
+    --secondary: 218 30% 95%;
+    --secondary-foreground: 218 85% 22%;
+
+    --muted: 218 20% 95%;
+    --muted-foreground: 220 12% 45%;
+
+    --accent: 218 30% 94%;
+    --accent-foreground: 218 85% 28%;
+
+    --success: 142 65% 38%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 220 25% 12%;
+    --destructive: 0 75% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 218 85% 32%;
+
+    --radius: 0.75rem;
+
+    --shadow-sm: 0 1px 2px hsl(220 25% 12% / 0.04);
+    --shadow-md: 0 4px 14px hsl(220 25% 12% / 0.08);
+    --shadow-lg: 0 16px 40px hsl(218 85% 32% / 0.15);
+
+    --gradient-hero: linear-gradient(135deg, hsl(218 85% 32%) 0%, hsl(218 85% 22%) 50%, hsl(218 90% 18%) 100%);
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(218 30% 98%) 100%);
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 25% 12%;
+    --sidebar-primary: 218 85% 32%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 218 30% 95%;
+    --sidebar-accent-foreground: 218 85% 22%;
+    --sidebar-border: 220 15% 88%;
+    --sidebar-ring: 218 85% 32%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-semibold tracking-tight text-foreground;
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
 }
