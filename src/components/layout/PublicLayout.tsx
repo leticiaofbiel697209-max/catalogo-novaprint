@@ -123,6 +123,10 @@ export default function PublicLayout() {
                 <Button asChild variant="ghost" className="flex-1"><Link to="/" onClick={() => setOpen(false)}>Início</Link></Button>
                 <Button asChild variant="ghost" className="flex-1"><Link to="/catalogo" onClick={() => setOpen(false)}>Catálogo</Link></Button>
               </div>
+              <Button variant="outline" className="w-full" onClick={() => { togglePrices(); setOpen(false); }}>
+                {showPrices ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+                {showPrices ? "Ocultar preços" : "Mostrar preços"}
+              </Button>
             </div>
           </div>
         )}
