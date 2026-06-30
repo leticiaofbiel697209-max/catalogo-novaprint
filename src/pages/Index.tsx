@@ -43,9 +43,7 @@ const Index = () => {
             <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-xs uppercase tracking-wider backdrop-blur">
               Portal de Pedidos NovaPrint
             </span>
-            <h1 className="text-4xl md:text-5xl font-bold leading-tight">
-              Monte seu pedido em minutos
-            </h1>
+            <h1 className="sr-only">Portal de Pedidos NovaPrint</h1>
             <p className="text-lg text-white/80 max-w-lg">
               Toners, cartuchos, papéis e suprimentos com agilidade. Navegue pelo catálogo, monte seu carrinho e envie sua solicitação — nossa equipe retorna com o orçamento.
             </p>

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatBRL } from "@/lib/format";
-import { ArrowLeft, Minus, Plus, Package, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Minus, Plus, Package, ShoppingCart, FileText } from "lucide-react";
 import { useState } from "react";
 import { useCart } from "@/store/cart";
 import { toast } from "sonner";
@@ -39,7 +39,7 @@ export default function ProductDetail() {
     );
   }
 
-  const handleAdd = () => {
+  const addToCart = (redirect: boolean) => {
     add({
       product_id: data.id,
       name: data.name,
@@ -48,8 +48,12 @@ export default function ProductDetail() {
       image_url: data.image_url,
       stock: data.stock,
     }, qty);
-    toast.success("Adicionado ao carrinho");
-    navigate("/carrinho");
+    if (redirect) {
+      toast.success("Adicionado ao carrinho");
+      navigate("/carrinho");
+    } else {
+      toast.success("Adicionado ao orçamento");
+    }
   };
 
   return (
@@ -90,8 +94,11 @@ export default function ProductDetail() {
               />
               <Button variant="ghost" size="icon" onClick={() => setQty((q) => q + 1)}><Plus className="h-4 w-4" /></Button>
             </div>
-            <Button onClick={handleAdd} disabled={data.stock <= 0} size="lg" className="flex-1">
-              <ShoppingCart className="h-4 w-4 mr-2" /> Adicionar ao carrinho
+            <Button onClick={() => addToCart(false)} variant="outline" disabled={data.stock <= 0} size="lg" className="flex-1">
+              <FileText className="h-4 w-4 mr-2" /> Adicionar ao orçamento
+            </Button>
+            <Button onClick={() => addToCart(true)} disabled={data.stock <= 0} size="lg" className="flex-1">
+              <ShoppingCart className="h-4 w-4 mr-2" /> Comprar agora
             </Button>
           </div>
         </div>

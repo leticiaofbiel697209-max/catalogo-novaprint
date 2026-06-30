@@ -11,6 +11,7 @@ import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderConfirmation from "./pages/OrderConfirmation";
+import Login from "./pages/Login";
 
 import AdminLogin from "./pages/admin/AdminLogin";
 import AdminLayout from "@/components/layout/AdminLayout";
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/carrinho" element={<Cart />} />
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/pedido/:id" element={<OrderConfirmation />} />
+            <Route path="/login" element={<Login />} />
           </Route>
 
           <Route path="/admin/login" element={<AdminLogin />} />
