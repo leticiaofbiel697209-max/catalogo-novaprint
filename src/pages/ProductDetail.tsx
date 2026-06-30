@@ -39,7 +39,7 @@ export default function ProductDetail() {
     );
   }
 
-  const handleAdd = () => {
+  const addToCart = (redirect: boolean) => {
     add({
       product_id: data.id,
       name: data.name,
@@ -48,8 +48,12 @@ export default function ProductDetail() {
       image_url: data.image_url,
       stock: data.stock,
     }, qty);
-    toast.success("Adicionado ao carrinho");
-    navigate("/carrinho");
+    if (redirect) {
+      toast.success("Adicionado ao carrinho");
+      navigate("/carrinho");
+    } else {
+      toast.success("Adicionado ao orçamento");
+    }
   };
 
   return (
