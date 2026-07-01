@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Printer, ShoppingCart, Search, Menu, X, LogIn, LogOut, User, Eye, EyeOff } from "lucide-react";
+import { ShoppingCart, Search, Menu, X, LogIn, LogOut, User, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/store/cart";
@@ -7,6 +7,7 @@ import { usePriceVisibility } from "@/store/priceVisibility";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import logo from "@/assets/novaprint-logo.png.asset.json";
 
 export default function PublicLayout() {
   const count = useCart((s) => s.count());
@@ -41,11 +42,8 @@ export default function PublicLayout() {
     <div className="min-h-screen flex flex-col bg-background">
       <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="container-page flex h-16 items-center gap-4">
-          <Link to="/" className="flex items-center gap-2 font-bold text-lg">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
-              <Printer className="h-5 w-5" />
-            </span>
-            <span className="text-primary">NovaPrint</span>
+          <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="NovaPrint - Início">
+            <img src={logo.url} alt="NovaPrint Brasil" className="h-10 w-auto" />
           </Link>
 
           <form onSubmit={submitSearch} className="hidden md:flex flex-1 max-w-xl relative">
@@ -138,12 +136,7 @@ export default function PublicLayout() {
 
       <footer className="border-t bg-card mt-12">
         <div className="container-page py-8 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <span className="grid h-7 w-7 place-items-center rounded bg-primary text-primary-foreground">
-              <Printer className="h-4 w-4" />
-            </span>
-            <span className="font-semibold text-foreground">NovaPrint</span>
-          </div>
+          <img src={logo.url} alt="NovaPrint Brasil" className="h-9 w-auto" />
           <p>© {new Date().getFullYear()} NovaPrint — Portal de Pedidos</p>
           <Link to="/admin" className="hover:text-primary">Área administrativa</Link>
         </div>

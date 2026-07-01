@@ -3,11 +3,14 @@ import { useCart } from "@/store/cart";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import PriceDisplay from "@/components/PriceDisplay";
-import { Trash2, Minus, Plus, ShoppingCart, ArrowRight, Package } from "lucide-react";
+import { Trash2, Minus, Plus, ShoppingCart, ArrowRight, Package, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { usePriceVisibility } from "@/store/priceVisibility";
 
 export default function Cart() {
   const { items, setQty, remove, total } = useCart();
+  const showPrices = usePriceVisibility((s) => s.showPrices);
 
   if (items.length === 0) {
     return (
@@ -22,7 +25,26 @@ export default function Cart() {
 
   return (
     <div className="container-page py-8">
-      <h1 className="text-3xl font-bold mb-6">Carrinho</h1>
+      <h1 className="text-3xl font-bold mb-4">Carrinho</h1>
+
+      {!showPrices && (
+        <Alert className="mb-6 border-primary/30 bg-primary/5">
+          <Info className="h-4 w-4 text-primary" />
+          <AlertTitle>Preços "Sob consulta"</AlertTitle>
+          <AlertDescription>
+            Você optou por ocultar os preços. Os valores aparecem como <strong>"Sob consulta"</strong> e a NovaPrint responderá com o orçamento oficial após o envio do pedido. Para reexibir, clique em <strong>"Mostrar preços"</strong> no topo da página.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <Alert className="mb-6">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Como enviar seu pedido</AlertTitle>
+        <AlertDescription>
+          Confira os itens abaixo, ajuste as quantidades e clique em <strong>"Finalizar pedido"</strong>. Preencha seus dados de contato na próxima etapa — nossa equipe recebe a solicitação e retorna com o orçamento e as condições de entrega.
+        </AlertDescription>
+      </Alert>
+
       <div className="grid lg:grid-cols-[1fr_360px] gap-6">
         <div className="space-y-3">
           {items.map((i) => (
