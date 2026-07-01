@@ -51,46 +51,24 @@ export default function Checkout() {
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
     try {
-      const { data: customer, error: cErr } = await supabase
-        .from("customers")
-        .insert({
-          name: values.name,
-          company: values.company,
-          cnpj: values.cnpj || null,
-          phone: values.phone || null,
-          email: values.email || null,
-        })
-        .select()
-        .single();
-      if (cErr) throw cErr;
-
-      const totalValue = total();
-      const { data: order, error: oErr } = await supabase
-        .from("orders")
-        .insert({
-          customer_id: customer.id,
-          total_value: totalValue,
-          status: "recebido",
+      const { data, error } = await supabase.functions.invoke("submit-order", {
+        body: {
+          customer: {
+            name: values.name,
+            company: values.company,
+            cnpj: values.cnpj || null,
+            phone: values.phone || null,
+            email: values.email || null,
+          },
+          items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
           notes: values.notes || null,
-        })
-        .select()
-        .single();
-      if (oErr) throw oErr;
-
-      const orderItems = items.map((i) => ({
-        order_id: order.id,
-        product_id: i.product_id,
-        product_name: i.name,
-        product_code: i.code,
-        quantity: i.quantity,
-        unit_price: i.price,
-        total_price: i.price * i.quantity,
-      }));
-      const { error: iErr } = await supabase.from("order_items").insert(orderItems);
-      if (iErr) throw iErr;
-
+        },
+      });
+      if (error) throw error;
+      if ((data as any)?.error) throw new Error((data as any).error);
+      const orderId = (data as any).order_id;
       clear();
-      navigate(`/pedido/${order.id}`);
+      navigate(`/pedido/${orderId}`);
     } catch (e: any) {
       console.error(e);
       toast.error(e.message ?? "Erro ao enviar pedido");
