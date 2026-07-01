@@ -1,1 +1,16 @@
 project_id = "eovrsgaakquemjikzxti"
+
+[functions.submit-order]
+verify_jwt = false
+
+[functions.send-order-to-gestaoclick]
+verify_jwt = true
+
+[functions.generate-product-descriptions]
+verify_jwt = true
+
+[functions.fetch-product-images]
+verify_jwt = true
+
+[functions.import-products]
+verify_jwt = true
