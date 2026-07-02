@@ -6,11 +6,11 @@ import PriceDisplay from "@/components/PriceDisplay";
 import { Trash2, Minus, Plus, ShoppingCart, ArrowRight, Package, Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { usePriceVisibility } from "@/store/priceVisibility";
+import { useCatalogShowPrices } from "@/hooks/useCatalogPriceVisibility";
 
 export default function Cart() {
   const { items, setQty, remove, total } = useCart();
-  const showPrices = usePriceVisibility((s) => s.showPrices);
+  const showPrices = useCatalogShowPrices();
 
   if (items.length === 0) {
     return (
@@ -32,7 +32,7 @@ export default function Cart() {
           <Info className="h-4 w-4 text-primary" />
           <AlertTitle>Preços "Sob consulta"</AlertTitle>
           <AlertDescription>
-            Você optou por ocultar os preços. Os valores aparecem como <strong>"Sob consulta"</strong> e a NovaPrint responderá com o orçamento oficial após o envio do pedido. Para reexibir, clique em <strong>"Mostrar preços"</strong> no topo da página.
+            Neste momento os preços estão como <strong>"Sob consulta"</strong>. Envie o pedido normalmente — a equipe NovaPrint retorna com o orçamento oficial e condições de pagamento.
           </AlertDescription>
         </Alert>
       )}
