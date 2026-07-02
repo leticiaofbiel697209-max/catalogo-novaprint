@@ -1,9 +1,8 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { ShoppingCart, Search, Menu, X, LogIn, LogOut, User, Eye, EyeOff } from "lucide-react";
+import { ShoppingCart, Search, Menu, X, LogIn, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCart } from "@/store/cart";
-import { usePriceVisibility } from "@/store/priceVisibility";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -15,8 +14,6 @@ export default function PublicLayout() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const showPrices = usePriceVisibility((s) => s.showPrices);
-  const togglePrices = usePriceVisibility((s) => s.toggle);
 
   useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
@@ -82,17 +79,6 @@ export default function PublicLayout() {
             </Button>
           )}
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={togglePrices}
-            title={showPrices ? "Ocultar preços" : "Mostrar preços"}
-            className="hidden md:flex"
-          >
-            {showPrices ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            <span className="hidden lg:inline ml-2">{showPrices ? "Ocultar preços" : "Mostrar preços"}</span>
-          </Button>
-
           <Button asChild variant="default" className="relative">
             <Link to="/carrinho">
               <ShoppingCart className="h-4 w-4" />
@@ -121,10 +107,6 @@ export default function PublicLayout() {
                 <Button asChild variant="ghost" className="flex-1"><Link to="/" onClick={() => setOpen(false)}>Início</Link></Button>
                 <Button asChild variant="ghost" className="flex-1"><Link to="/catalogo" onClick={() => setOpen(false)}>Catálogo</Link></Button>
               </div>
-              <Button variant="outline" className="w-full" onClick={() => { togglePrices(); setOpen(false); }}>
-                {showPrices ? <EyeOff className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
-                {showPrices ? "Ocultar preços" : "Mostrar preços"}
-              </Button>
             </div>
           </div>
         )}

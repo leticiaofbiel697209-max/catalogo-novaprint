@@ -1,5 +1,5 @@
 import { formatBRL } from "@/lib/format";
-import { usePriceVisibility } from "@/store/priceVisibility";
+import { useCatalogShowPrices } from "@/hooks/useCatalogPriceVisibility";
 
 interface PriceDisplayProps {
   value: number;
@@ -7,7 +7,7 @@ interface PriceDisplayProps {
 }
 
 export default function PriceDisplay({ value, className = "" }: PriceDisplayProps) {
-  const showPrices = usePriceVisibility((s) => s.showPrices);
+  const showPrices = useCatalogShowPrices();
   if (!showPrices) {
     return <span className={`text-muted-foreground italic ${className}`}>Sob consulta</span>;
   }

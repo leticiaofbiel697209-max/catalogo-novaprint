@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LayoutDashboard, Package, Tags, ShoppingBag, FileText, LogOut, Printer, Images, FileSpreadsheet } from "lucide-react";
+import { Loader2, LayoutDashboard, Package, Tags, ShoppingBag, FileText, LogOut, Printer, Images, FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Session } from "@supabase/supabase-js";
 
@@ -63,6 +63,7 @@ export default function AdminLayout() {
     { to: "/admin/logs", label: "Logs", icon: FileText },
     { to: "/admin/importar-imagens", label: "Importar imagens", icon: Images },
     { to: "/admin/importar-produtos", label: "Importar produtos", icon: FileSpreadsheet },
+    { to: "/admin/administradores", label: "Administradores", icon: ShieldCheck },
   ];
 
   return (
