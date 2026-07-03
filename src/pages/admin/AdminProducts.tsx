@@ -49,6 +49,21 @@ export default function AdminProducts() {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const showPrices = useCatalogShowPrices();
+  const [savingPrices, setSavingPrices] = useState(false);
+
+  const togglePrices = async (checked: boolean) => {
+    setSavingPrices(true);
+    try {
+      await setCatalogShowPrices(checked);
+      await qc.invalidateQueries({ queryKey: ["settings", "catalog_show_prices"] });
+      toast.success(checked ? "Preços visíveis no catálogo" : "Preços ocultos — clientes verão 'Sob consulta'");
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao salvar");
+    } finally {
+      setSavingPrices(false);
+    }
+  };
 
 
   const callFn = async (name: string, body: any) => {
