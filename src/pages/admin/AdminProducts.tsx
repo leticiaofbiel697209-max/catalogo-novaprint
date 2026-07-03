@@ -9,9 +9,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Upload, Loader2, Sparkles, ImageDown, FileSpreadsheet, Search, X } from "lucide-react";
+import { Plus, Pencil, Upload, Loader2, Sparkles, ImageDown, FileSpreadsheet, Search, X, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
 import { formatBRL } from "@/lib/format";
+import { useCatalogShowPrices, setCatalogShowPrices } from "@/hooks/useCatalogPriceVisibility";
 
 
 
@@ -48,6 +49,21 @@ export default function AdminProducts() {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const showPrices = useCatalogShowPrices();
+  const [savingPrices, setSavingPrices] = useState(false);
+
+  const togglePrices = async (checked: boolean) => {
+    setSavingPrices(true);
+    try {
+      await setCatalogShowPrices(checked);
+      await qc.invalidateQueries({ queryKey: ["settings", "catalog_show_prices"] });
+      toast.success(checked ? "Preços visíveis no catálogo" : "Preços ocultos — clientes verão 'Sob consulta'");
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao salvar");
+    } finally {
+      setSavingPrices(false);
+    }
+  };
 
 
   const callFn = async (name: string, body: any) => {
@@ -465,6 +481,27 @@ export default function AdminProducts() {
           </SelectContent>
         </Select>
       </div>
+
+      <Card className={showPrices ? "border-success/40 bg-success/5" : "border-warning/40 bg-warning/5"}>
+        <CardContent className="p-4 flex items-center gap-4 flex-wrap">
+          <div className={`grid h-10 w-10 place-items-center rounded-lg ${showPrices ? "text-success bg-success/10" : "text-warning bg-warning/10"}`}>
+            {showPrices ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+          </div>
+          <div className="flex-1 min-w-[220px]">
+            <div className="font-semibold text-sm">Exibir preços no catálogo público</div>
+            <p className="text-xs text-muted-foreground">
+              Controla se os clientes veem os preços de todos os produtos ou <strong>"Sob consulta"</strong>.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {savingPrices && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <Label htmlFor="show-prices-products" className="text-sm">{showPrices ? "Visíveis" : "Ocultos"}</Label>
+            <Switch id="show-prices-products" checked={showPrices} onCheckedChange={togglePrices} disabled={savingPrices} />
+          </div>
+        </CardContent>
+      </Card>
+
+
 
       <Card>
         <CardContent className="p-0">
