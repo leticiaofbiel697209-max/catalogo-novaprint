@@ -482,6 +482,27 @@ export default function AdminProducts() {
         </Select>
       </div>
 
+      <Card className={showPrices ? "border-success/40 bg-success/5" : "border-warning/40 bg-warning/5"}>
+        <CardContent className="p-4 flex items-center gap-4 flex-wrap">
+          <div className={`grid h-10 w-10 place-items-center rounded-lg ${showPrices ? "text-success bg-success/10" : "text-warning bg-warning/10"}`}>
+            {showPrices ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+          </div>
+          <div className="flex-1 min-w-[220px]">
+            <div className="font-semibold text-sm">Exibir preços no catálogo público</div>
+            <p className="text-xs text-muted-foreground">
+              Controla se os clientes veem os preços de todos os produtos ou <strong>"Sob consulta"</strong>.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {savingPrices && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <Label htmlFor="show-prices-products" className="text-sm">{showPrices ? "Visíveis" : "Ocultos"}</Label>
+            <Switch id="show-prices-products" checked={showPrices} onCheckedChange={togglePrices} disabled={savingPrices} />
+          </div>
+        </CardContent>
+      </Card>
+
+
+
       <Card>
         <CardContent className="p-0">
           <div className="px-4 py-2 text-xs text-muted-foreground border-b">
