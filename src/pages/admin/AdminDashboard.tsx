@@ -1,17 +1,68 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Package, ShoppingBag, Inbox, AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Package, ShoppingBag, Inbox, AlertCircle, Eye, EyeOff, Loader2, Image as ImageIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useCatalogShowPrices, setCatalogShowPrices } from "@/hooks/useCatalogPriceVisibility";
+import { useSetting, setSetting } from "@/hooks/useSetting";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function AdminDashboard() {
   const qc = useQueryClient();
   const showPrices = useCatalogShowPrices();
   const [saving, setSaving] = useState(false);
+  const bannerVisible = useSetting("home_banner_visible") === "true";
+  const bannerTitle = useSetting("home_banner_title");
+  const bannerSubtitle = useSetting("home_banner_subtitle");
+  const bannerImage = useSetting("home_banner_image");
+  const [bTitle, setBTitle] = useState("");
+  const [bSub, setBSub] = useState("");
+  const [bImg, setBImg] = useState("");
+  const [savingBanner, setSavingBanner] = useState(false);
+  useEffect(() => { setBTitle(bannerTitle ?? ""); }, [bannerTitle]);
+  useEffect(() => { setBSub(bannerSubtitle ?? ""); }, [bannerSubtitle]);
+  useEffect(() => { setBImg(bannerImage ?? ""); }, [bannerImage]);
+
+  const toggleBanner = async (v: boolean) => {
+    try {
+      await setSetting("home_banner_visible", v ? "true" : "false");
+      qc.invalidateQueries({ queryKey: ["settings", "home_banner_visible"] });
+      toast.success(v ? "Banner visível" : "Banner oculto");
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  const saveBanner = async () => {
+    setSavingBanner(true);
+    try {
+      await Promise.all([
+        setSetting("home_banner_title", bTitle),
+        setSetting("home_banner_subtitle", bSub),
+        setSetting("home_banner_image", bImg),
+      ]);
+      ["home_banner_title","home_banner_subtitle","home_banner_image"].forEach(k =>
+        qc.invalidateQueries({ queryKey: ["settings", k] })
+      );
+      toast.success("Banner salvo");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSavingBanner(false); }
+  };
+
+  const uploadBanner = async (file: File) => {
+    setSavingBanner(true);
+    try {
+      const path = `banner-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      const { error } = await supabase.storage.from("product-images").upload(path, file);
+      if (error) throw error;
+      const { data: signed } = await supabase.storage.from("product-images").createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+      if (signed?.signedUrl) setBImg(signed.signedUrl);
+      toast.success("Imagem carregada — clique em Salvar");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSavingBanner(false); }
+  };
 
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
@@ -91,6 +142,50 @@ export default function AdminDashboard() {
             {saving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             <Label htmlFor="show-prices" className="text-sm">{showPrices ? "Visíveis" : "Ocultos"}</Label>
             <Switch id="show-prices" checked={showPrices} onCheckedChange={togglePrices} disabled={saving} />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className={`grid h-12 w-12 place-items-center rounded-lg ${bannerVisible ? "text-primary bg-primary/10" : "text-muted-foreground bg-muted"}`}>
+              <ImageIcon className="h-6 w-6" />
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <div className="font-semibold">Banner da página inicial</div>
+              <p className="text-sm text-muted-foreground">Exibe uma faixa promocional no topo da home. Configure título, subtítulo e imagem.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="banner-visible" className="text-sm">{bannerVisible ? "Visível" : "Oculto"}</Label>
+              <Switch id="banner-visible" checked={bannerVisible} onCheckedChange={toggleBanner} />
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <Label>Título</Label>
+              <Input value={bTitle} onChange={(e) => setBTitle(e.target.value)} placeholder="Ex: Promoção de Toners" />
+            </div>
+            <div>
+              <Label>Subtítulo</Label>
+              <Input value={bSub} onChange={(e) => setBSub(e.target.value)} placeholder="Ex: Até 30% OFF em toda a linha HP" />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Imagem (URL)</Label>
+              <div className="flex gap-2">
+                <Input value={bImg} onChange={(e) => setBImg(e.target.value)} placeholder="https://... ou faça upload" />
+                <label>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadBanner(e.target.files[0])} />
+                  <Button type="button" variant="outline" asChild><span>Upload</span></Button>
+                </label>
+              </div>
+              {bImg && <img src={bImg} alt="banner" className="mt-2 max-h-32 rounded border" />}
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={saveBanner} disabled={savingBanner}>
+              {savingBanner && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Salvar banner
+            </Button>
           </div>
         </CardContent>
       </Card>

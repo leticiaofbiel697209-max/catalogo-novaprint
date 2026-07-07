@@ -7,10 +7,15 @@ import { ArrowRight, Search, Truck, Shield, Headphones } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSetting } from "@/hooks/useSetting";
 
 const Index = () => {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
+  const bannerVisible = useSetting("home_banner_visible") === "true";
+  const bannerTitle = useSetting("home_banner_title");
+  const bannerSubtitle = useSetting("home_banner_subtitle");
+  const bannerImage = useSetting("home_banner_image");
 
   const { data: categories } = useQuery({
     queryKey: ["home-categories"],
@@ -37,6 +42,27 @@ const Index = () => {
 
   return (
     <>
+      {bannerVisible && (bannerTitle || bannerImage) && (
+        <section className="relative overflow-hidden">
+          {bannerImage ? (
+            <div className="relative h-40 md:h-56 w-full">
+              <img src={bannerImage} alt={bannerTitle ?? "Banner"} className="absolute inset-0 h-full w-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-black/20" />
+              <div className="container-page relative h-full flex flex-col justify-center text-white">
+                {bannerTitle && <h2 className="text-2xl md:text-4xl font-bold">{bannerTitle}</h2>}
+                {bannerSubtitle && <p className="mt-1 md:text-lg text-white/90">{bannerSubtitle}</p>}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-accent-brand text-accent-brand-foreground">
+              <div className="container-page py-4 text-center">
+                <span className="font-semibold">{bannerTitle}</span>
+                {bannerSubtitle && <span className="ml-2 opacity-90">— {bannerSubtitle}</span>}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
       <section className="relative overflow-hidden text-primary-foreground" style={{ background: "var(--gradient-hero)" }}>
         <div className="container-page py-16 md:py-24 grid md:grid-cols-2 gap-10 items-center">
           <div className="space-y-6">
