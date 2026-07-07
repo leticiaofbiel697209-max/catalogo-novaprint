@@ -1,17 +1,68 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
-import { Package, ShoppingBag, Inbox, AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Package, ShoppingBag, Inbox, AlertCircle, Eye, EyeOff, Loader2, Image as ImageIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { useCatalogShowPrices, setCatalogShowPrices } from "@/hooks/useCatalogPriceVisibility";
+import { useSetting, setSetting } from "@/hooks/useSetting";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function AdminDashboard() {
   const qc = useQueryClient();
   const showPrices = useCatalogShowPrices();
   const [saving, setSaving] = useState(false);
+  const bannerVisible = useSetting("home_banner_visible") === "true";
+  const bannerTitle = useSetting("home_banner_title");
+  const bannerSubtitle = useSetting("home_banner_subtitle");
+  const bannerImage = useSetting("home_banner_image");
+  const [bTitle, setBTitle] = useState("");
+  const [bSub, setBSub] = useState("");
+  const [bImg, setBImg] = useState("");
+  const [savingBanner, setSavingBanner] = useState(false);
+  useEffect(() => { setBTitle(bannerTitle ?? ""); }, [bannerTitle]);
+  useEffect(() => { setBSub(bannerSubtitle ?? ""); }, [bannerSubtitle]);
+  useEffect(() => { setBImg(bannerImage ?? ""); }, [bannerImage]);
+
+  const toggleBanner = async (v: boolean) => {
+    try {
+      await setSetting("home_banner_visible", v ? "true" : "false");
+      qc.invalidateQueries({ queryKey: ["settings", "home_banner_visible"] });
+      toast.success(v ? "Banner visível" : "Banner oculto");
+    } catch (e: any) { toast.error(e.message); }
+  };
+
+  const saveBanner = async () => {
+    setSavingBanner(true);
+    try {
+      await Promise.all([
+        setSetting("home_banner_title", bTitle),
+        setSetting("home_banner_subtitle", bSub),
+        setSetting("home_banner_image", bImg),
+      ]);
+      ["home_banner_title","home_banner_subtitle","home_banner_image"].forEach(k =>
+        qc.invalidateQueries({ queryKey: ["settings", k] })
+      );
+      toast.success("Banner salvo");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSavingBanner(false); }
+  };
+
+  const uploadBanner = async (file: File) => {
+    setSavingBanner(true);
+    try {
+      const path = `banner-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
+      const { error } = await supabase.storage.from("product-images").upload(path, file);
+      if (error) throw error;
+      const { data: signed } = await supabase.storage.from("product-images").createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+      if (signed?.signedUrl) setBImg(signed.signedUrl);
+      toast.success("Imagem carregada — clique em Salvar");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setSavingBanner(false); }
+  };
 
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
