@@ -526,9 +526,17 @@ export default function AdminProducts() {
                   <div className="text-xs text-muted-foreground">Custo: {formatBRL(p.product_costs?.cost_price ?? 0)}</div>
                   <div className="text-xs text-muted-foreground">Estoque: {p.stock}</div>
                 </div>
-                <span className={`rounded-full px-2 py-0.5 text-xs ${p.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
-                  {p.active ? "Ativo" : "Inativo"}
-                </span>
+                <label className="flex items-center gap-2 text-xs cursor-pointer" title={p.active ? "Visível no catálogo" : "Oculto"}>
+                  <Switch
+                    checked={p.active}
+                    onCheckedChange={async (v) => {
+                      await supabase.from("products").update({ active: v }).eq("id", p.id);
+                      qc.invalidateQueries({ queryKey: ["admin-products"] });
+                      toast.success(v ? "Produto visível" : "Produto oculto");
+                    }}
+                  />
+                  {p.active ? <Eye className="h-4 w-4 text-success" /> : <EyeOff className="h-4 w-4 text-muted-foreground" />}
+                </label>
                 <Button size="icon" variant="ghost" title="Buscar imagem na web" onClick={() => fetchOneImage(p.id)} disabled={rowBusy[p.id] === "img"}>
                   {rowBusy[p.id] === "img" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageDown className="h-4 w-4" />}
                 </Button>
