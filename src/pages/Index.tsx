@@ -7,10 +7,15 @@ import { ArrowRight, Search, Truck, Shield, Headphones } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useSetting } from "@/hooks/useSetting";
 
 const Index = () => {
   const navigate = useNavigate();
   const [q, setQ] = useState("");
+  const bannerVisible = useSetting("home_banner_visible") === "true";
+  const bannerTitle = useSetting("home_banner_title");
+  const bannerSubtitle = useSetting("home_banner_subtitle");
+  const bannerImage = useSetting("home_banner_image");
 
   const { data: categories } = useQuery({
     queryKey: ["home-categories"],
