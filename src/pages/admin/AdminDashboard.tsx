@@ -146,6 +146,50 @@ export default function AdminDashboard() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className={`grid h-12 w-12 place-items-center rounded-lg ${bannerVisible ? "text-primary bg-primary/10" : "text-muted-foreground bg-muted"}`}>
+              <ImageIcon className="h-6 w-6" />
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <div className="font-semibold">Banner da página inicial</div>
+              <p className="text-sm text-muted-foreground">Exibe uma faixa promocional no topo da home. Configure título, subtítulo e imagem.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="banner-visible" className="text-sm">{bannerVisible ? "Visível" : "Oculto"}</Label>
+              <Switch id="banner-visible" checked={bannerVisible} onCheckedChange={toggleBanner} />
+            </div>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <Label>Título</Label>
+              <Input value={bTitle} onChange={(e) => setBTitle(e.target.value)} placeholder="Ex: Promoção de Toners" />
+            </div>
+            <div>
+              <Label>Subtítulo</Label>
+              <Input value={bSub} onChange={(e) => setBSub(e.target.value)} placeholder="Ex: Até 30% OFF em toda a linha HP" />
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Imagem (URL)</Label>
+              <div className="flex gap-2">
+                <Input value={bImg} onChange={(e) => setBImg(e.target.value)} placeholder="https://... ou faça upload" />
+                <label>
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadBanner(e.target.files[0])} />
+                  <Button type="button" variant="outline" asChild><span>Upload</span></Button>
+                </label>
+              </div>
+              {bImg && <img src={bImg} alt="banner" className="mt-2 max-h-32 rounded border" />}
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button onClick={saveBanner} disabled={savingBanner}>
+              {savingBanner && <Loader2 className="h-4 w-4 mr-2 animate-spin" />} Salvar banner
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {(stats?.pendingReqs ?? 0) > 0 && (
         <Card className="border-primary/40 bg-primary/5">
           <CardContent className="p-4 text-sm">
