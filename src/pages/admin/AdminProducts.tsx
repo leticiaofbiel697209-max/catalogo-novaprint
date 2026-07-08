@@ -521,6 +521,20 @@ export default function AdminProducts() {
             {categories?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={missingFilter} onValueChange={setMissingFilter}>
+          <SelectTrigger className="sm:w-64"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os produtos</SelectItem>
+            <SelectItem value="no_image">Sem imagem ({counts.noImg})</SelectItem>
+            <SelectItem value="no_description">Sem descrição ({counts.noDesc})</SelectItem>
+            <SelectItem value="no_both">Sem imagem e sem descrição ({counts.both})</SelectItem>
+            <SelectItem value="no_any">Sem imagem ou descrição</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" onClick={hideAllWithoutImage} disabled={hidingNoImage} title="Desativa todos os produtos que não possuem imagem">
+          {hidingNoImage ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <EyeOff className="h-4 w-4 mr-1" />}
+          Ocultar sem imagem
+        </Button>
       </div>
 
       <Card className={showPrices ? "border-success/40 bg-success/5" : "border-warning/40 bg-warning/5"}>
