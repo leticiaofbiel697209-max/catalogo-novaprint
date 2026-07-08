@@ -49,8 +49,30 @@ export default function AdminProducts() {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [missingFilter, setMissingFilter] = useState<string>("all");
+  const [hidingNoImage, setHidingNoImage] = useState(false);
   const showPrices = useCatalogShowPrices();
   const [savingPrices, setSavingPrices] = useState(false);
+
+  const hideAllWithoutImage = async () => {
+    if (!confirm("Ocultar do catálogo todos os produtos sem imagem? Você poderá reativá-los individualmente depois.")) return;
+    setHidingNoImage(true);
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .update({ active: false })
+        .or("image_url.is.null,image_url.eq.")
+        .eq("active", true)
+        .select("id");
+      if (error) throw error;
+      toast.success(`${data?.length ?? 0} produto(s) sem imagem ocultado(s)`);
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setHidingNoImage(false);
+    }
+  };
 
   const togglePrices = async (checked: boolean) => {
     setSavingPrices(true);
@@ -135,6 +157,12 @@ export default function AdminProducts() {
     const q = search.trim().toLowerCase();
     return (products ?? []).filter((p: any) => {
       if (categoryFilter !== "all" && p.category_id !== categoryFilter) return false;
+      const noImage = !p.image_url;
+      const noDesc = !p.description || !String(p.description).trim();
+      if (missingFilter === "no_image" && !noImage) return false;
+      if (missingFilter === "no_description" && !noDesc) return false;
+      if (missingFilter === "no_both" && !(noImage && noDesc)) return false;
+      if (missingFilter === "no_any" && !(noImage || noDesc)) return false;
       if (!q) return true;
       return (
         p.name?.toLowerCase().includes(q) ||
@@ -143,7 +171,20 @@ export default function AdminProducts() {
         p.categories?.name?.toLowerCase().includes(q)
       );
     });
-  }, [products, search, categoryFilter]);
+  }, [products, search, categoryFilter, missingFilter]);
+
+  const counts = useMemo(() => {
+    const list = products ?? [];
+    let noImg = 0, noDesc = 0, both = 0;
+    for (const p of list as any[]) {
+      const ni = !p.image_url;
+      const nd = !p.description || !String(p.description).trim();
+      if (ni) noImg++;
+      if (nd) noDesc++;
+      if (ni && nd) both++;
+    }
+    return { total: list.length, noImg, noDesc, both };
+  }, [products]);
 
 
   const { data: categories } = useQuery({
@@ -480,6 +521,20 @@ export default function AdminProducts() {
             {categories?.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
+        <Select value={missingFilter} onValueChange={setMissingFilter}>
+          <SelectTrigger className="sm:w-64"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os produtos</SelectItem>
+            <SelectItem value="no_image">Sem imagem ({counts.noImg})</SelectItem>
+            <SelectItem value="no_description">Sem descrição ({counts.noDesc})</SelectItem>
+            <SelectItem value="no_both">Sem imagem e sem descrição ({counts.both})</SelectItem>
+            <SelectItem value="no_any">Sem imagem ou descrição</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button variant="outline" onClick={hideAllWithoutImage} disabled={hidingNoImage} title="Desativa todos os produtos que não possuem imagem">
+          {hidingNoImage ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <EyeOff className="h-4 w-4 mr-1" />}
+          Ocultar sem imagem
+        </Button>
       </div>
 
       <Card className={showPrices ? "border-success/40 bg-success/5" : "border-warning/40 bg-warning/5"}>
