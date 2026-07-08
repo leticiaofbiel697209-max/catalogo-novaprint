@@ -49,8 +49,30 @@ export default function AdminProducts() {
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [missingFilter, setMissingFilter] = useState<string>("all");
+  const [hidingNoImage, setHidingNoImage] = useState(false);
   const showPrices = useCatalogShowPrices();
   const [savingPrices, setSavingPrices] = useState(false);
+
+  const hideAllWithoutImage = async () => {
+    if (!confirm("Ocultar do catálogo todos os produtos sem imagem? Você poderá reativá-los individualmente depois.")) return;
+    setHidingNoImage(true);
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .update({ active: false })
+        .or("image_url.is.null,image_url.eq.")
+        .eq("active", true)
+        .select("id");
+      if (error) throw error;
+      toast.success(`${data?.length ?? 0} produto(s) sem imagem ocultado(s)`);
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setHidingNoImage(false);
+    }
+  };
 
   const togglePrices = async (checked: boolean) => {
     setSavingPrices(true);
@@ -135,6 +157,12 @@ export default function AdminProducts() {
     const q = search.trim().toLowerCase();
     return (products ?? []).filter((p: any) => {
       if (categoryFilter !== "all" && p.category_id !== categoryFilter) return false;
+      const noImage = !p.image_url;
+      const noDesc = !p.description || !String(p.description).trim();
+      if (missingFilter === "no_image" && !noImage) return false;
+      if (missingFilter === "no_description" && !noDesc) return false;
+      if (missingFilter === "no_both" && !(noImage && noDesc)) return false;
+      if (missingFilter === "no_any" && !(noImage || noDesc)) return false;
       if (!q) return true;
       return (
         p.name?.toLowerCase().includes(q) ||
@@ -143,7 +171,20 @@ export default function AdminProducts() {
         p.categories?.name?.toLowerCase().includes(q)
       );
     });
-  }, [products, search, categoryFilter]);
+  }, [products, search, categoryFilter, missingFilter]);
+
+  const counts = useMemo(() => {
+    const list = products ?? [];
+    let noImg = 0, noDesc = 0, both = 0;
+    for (const p of list as any[]) {
+      const ni = !p.image_url;
+      const nd = !p.description || !String(p.description).trim();
+      if (ni) noImg++;
+      if (nd) noDesc++;
+      if (ni && nd) both++;
+    }
+    return { total: list.length, noImg, noDesc, both };
+  }, [products]);
 
 
   const { data: categories } = useQuery({
