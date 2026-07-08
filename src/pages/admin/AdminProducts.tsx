@@ -149,48 +149,50 @@ export default function AdminProducts() {
   };
 
   const { data: products } = useQuery({
-    queryKey: ["admin-products"],
+    queryKey: ["admin-products", debouncedSearch, categoryFilter, missingFilter],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("products")
         .select("*, categories(name), product_costs(cost_price)")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      if (categoryFilter !== "all") query = query.eq("category_id", categoryFilter);
+      if (missingFilter === "no_image") query = query.is("image_url", null);
+      if (missingFilter === "no_description") query = query.or("description.is.null,description.eq.");
+      if (missingFilter === "no_both")
+        query = query.is("image_url", null).or("description.is.null,description.eq.");
+      if (missingFilter === "no_any")
+        query = query.or("image_url.is.null,description.is.null,description.eq.");
+
+      if (debouncedSearch) {
+        const terms = debouncedSearch.split(/\s+/).filter(Boolean).slice(0, 5);
+        for (const term of terms) {
+          const like = `%${term.replace(/[%_]/g, "\\$&")}%`;
+          query = query.or(
+            `name.ilike.${like},code.ilike.${like},brand.ilike.${like},description.ilike.${like}`
+          );
+        }
+      }
+      const { data, error } = await query;
+      if (error) throw error;
       return data ?? [];
     },
   });
 
-  const filteredProducts = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return (products ?? []).filter((p: any) => {
-      if (categoryFilter !== "all" && p.category_id !== categoryFilter) return false;
-      const noImage = !p.image_url;
-      const noDesc = !p.description || !String(p.description).trim();
-      if (missingFilter === "no_image" && !noImage) return false;
-      if (missingFilter === "no_description" && !noDesc) return false;
-      if (missingFilter === "no_both" && !(noImage && noDesc)) return false;
-      if (missingFilter === "no_any" && !(noImage || noDesc)) return false;
-      if (!q) return true;
-      return (
-        p.name?.toLowerCase().includes(q) ||
-        p.code?.toLowerCase().includes(q) ||
-        p.brand?.toLowerCase().includes(q) ||
-        p.categories?.name?.toLowerCase().includes(q)
-      );
-    });
-  }, [products, search, categoryFilter, missingFilter]);
+  const filteredProducts = products ?? [];
 
-  const counts = useMemo(() => {
-    const list = products ?? [];
-    let noImg = 0, noDesc = 0, both = 0;
-    for (const p of list as any[]) {
-      const ni = !p.image_url;
-      const nd = !p.description || !String(p.description).trim();
-      if (ni) noImg++;
-      if (nd) noDesc++;
-      if (ni && nd) both++;
-    }
-    return { total: list.length, noImg, noDesc, both };
-  }, [products]);
+  const { data: counts } = useQuery({
+    queryKey: ["admin-products-counts"],
+    queryFn: async () => {
+      const total = await supabase.from("products").select("id", { count: "exact", head: true });
+      const noImg = await supabase.from("products").select("id", { count: "exact", head: true }).is("image_url", null);
+      const noDesc = await supabase.from("products").select("id", { count: "exact", head: true }).or("description.is.null,description.eq.");
+      const both = await supabase.from("products").select("id", { count: "exact", head: true }).is("image_url", null).or("description.is.null,description.eq.");
+      return { total: total.count ?? 0, noImg: noImg.count ?? 0, noDesc: noDesc.count ?? 0, both: both.count ?? 0 };
+    },
+  });
+  const c = counts ?? { total: 0, noImg: 0, noDesc: 0, both: 0 };
 
 
   const { data: categories } = useQuery({
