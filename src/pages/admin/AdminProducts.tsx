@@ -533,9 +533,9 @@ export default function AdminProducts() {
           <SelectTrigger className="sm:w-64"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Todos os produtos</SelectItem>
-            <SelectItem value="no_image">Sem imagem ({counts.noImg})</SelectItem>
-            <SelectItem value="no_description">Sem descrição ({counts.noDesc})</SelectItem>
-            <SelectItem value="no_both">Sem imagem e sem descrição ({counts.both})</SelectItem>
+            <SelectItem value="no_image">Sem imagem ({c.noImg})</SelectItem>
+            <SelectItem value="no_description">Sem descrição ({c.noDesc})</SelectItem>
+            <SelectItem value="no_both">Sem imagem e sem descrição ({c.both})</SelectItem>
             <SelectItem value="no_any">Sem imagem ou descrição</SelectItem>
           </SelectContent>
         </Select>
