@@ -48,11 +48,17 @@ export default function AdminProducts() {
   const [importingSheet, setImportingSheet] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [missingFilter, setMissingFilter] = useState<string>("all");
   const [hidingNoImage, setHidingNoImage] = useState(false);
   const showPrices = useCatalogShowPrices();
   const [savingPrices, setSavingPrices] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const hideAllWithoutImage = async () => {
     if (!confirm("Ocultar do catálogo todos os produtos sem imagem? Você poderá reativá-los individualmente depois.")) return;
