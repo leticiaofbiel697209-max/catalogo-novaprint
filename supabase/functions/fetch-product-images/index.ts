@@ -14,35 +14,54 @@ interface ReqBody {
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
 
+// Blocklist para filtrar resultados NSFW / pornográficos
+const NSFW_KEYWORDS = [
+  "porn", "porno", "xxx", "sex", "sexo", "nude", "nudes", "naked", "erotic", "erotico", "erótico",
+  "adult", "adulto", "hentai", "xvideos", "xnxx", "xhamster", "redtube", "pornhub", "youporn",
+  "onlyfans", "camgirl", "escort", "acompanhante", "boobs", "peito", "bunda", "pussy", "dick",
+  "penis", "vagina", "anal", "fetish", "fetiche", "bdsm", "milf", "teen sex", "cumshot",
+];
+
+function looksNSFW(text: string): boolean {
+  const t = text.toLowerCase();
+  return NSFW_KEYWORDS.some((k) => t.includes(k));
+}
+
 async function searchImage(query: string): Promise<string | null> {
-  const url = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&form=HDRSC2&first=1`;
+  // Se a própria consulta contém termo suspeito, aborta
+  if (looksNSFW(query)) return null;
+  // adlt=strict força SafeSearch estrito no Bing; cookie reforça a preferência
+  const url = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&form=HDRSC2&first=1&safeSearch=Strict&adlt=strict`;
   try {
-    const r = await fetch(url, { headers: { "User-Agent": UA, "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8" } });
+    const r = await fetch(url, {
+      headers: {
+        "User-Agent": UA,
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+        "Cookie": "SRCHHPGUSR=ADLT=STRICT&ADLT_SET=1",
+      },
+    });
     if (!r.ok) return null;
     const html = await r.text();
     const candidates: string[] = [];
-    // Bing wraps each result in <a class="iusc" m='{"murl":"...","turl":"..."}'>
     const reM = /m="([^"]+)"/g;
     let m: RegExpExecArray | null;
     while ((m = reM.exec(html)) !== null) {
       try {
-        const decoded = m[1]
-          .replace(/&quot;/g, '"')
-          .replace(/&amp;/g, "&");
+        const decoded = m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&");
         const obj = JSON.parse(decoded);
         const u: string | undefined = obj.murl;
-        if (u && /^https?:\/\//i.test(u) && /\.(jpe?g|png|webp)(\?|$)/i.test(u)) {
+        const t: string = `${obj.t ?? ""} ${obj.desc ?? ""} ${u ?? ""}`;
+        if (u && /^https?:\/\//i.test(u) && /\.(jpe?g|png|webp)(\?|$)/i.test(u) && !looksNSFW(t)) {
           candidates.push(u);
         }
       } catch { /* ignore */ }
       if (candidates.length >= 10) break;
     }
-    // Fallback regex
     if (candidates.length === 0) {
       const re2 = /"murl":"(https?:[^"\\]+)"/g;
       while ((m = re2.exec(html)) !== null) {
         const u = m[1];
-        if (/\.(jpe?g|png|webp)(\?|$)/i.test(u)) candidates.push(u);
+        if (/\.(jpe?g|png|webp)(\?|$)/i.test(u) && !looksNSFW(u)) candidates.push(u);
         if (candidates.length >= 10) break;
       }
     }
