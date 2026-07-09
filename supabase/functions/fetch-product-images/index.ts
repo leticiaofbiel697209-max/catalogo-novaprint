@@ -158,11 +158,6 @@ function shouldReplaceExistingImage(url: string | null, overwrite?: boolean): bo
   if (!url) return true;
   return overwrite === true;
 }
-    return candidates[0] ?? null;
-  } catch {
-    return null;
-  }
-}
 
 async function downloadImage(url: string): Promise<{ bytes: Uint8Array; contentType: string } | null> {
   try {
