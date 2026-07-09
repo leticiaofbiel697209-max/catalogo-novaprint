@@ -16,18 +16,20 @@ export interface ProductCardProps {
     price: number;
     stock: number;
     image_url: string | null;
+    image_review_status?: string | null;
   };
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
   const add = useCart((s) => s.add);
+  const approvedImage = product.image_review_status === "approved" ? product.image_url : null;
   const handleAdd = () => {
     add({
       product_id: product.id,
       name: product.name,
       code: product.code,
       price: Number(product.price),
-      image_url: product.image_url,
+      image_url: approvedImage,
       stock: product.stock,
     });
     toast.success(`${product.name} adicionado ao carrinho`);
@@ -35,9 +37,9 @@ export default function ProductCard({ product }: ProductCardProps) {
   return (
     <Card className="group overflow-hidden border-border/60 hover:border-primary/40 hover:shadow-[var(--shadow-md)] transition-all">
       <Link to={`/produto/${product.id}`} className="block aspect-square overflow-hidden bg-muted">
-        {product.image_url ? (
+        {approvedImage ? (
           <img
-            src={product.image_url}
+            src={approvedImage}
             alt={product.name}
             className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"

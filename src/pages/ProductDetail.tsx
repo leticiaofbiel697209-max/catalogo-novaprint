@@ -40,12 +40,13 @@ export default function ProductDetail() {
   }
 
   const addToCart = (redirect: boolean) => {
+    const approvedImage = data.image_review_status === "approved" ? data.image_url : null;
     add({
       product_id: data.id,
       name: data.name,
       code: data.code,
       price: Number(data.price),
-      image_url: data.image_url,
+      image_url: approvedImage,
       stock: data.stock,
     }, qty);
     if (redirect) {
@@ -56,6 +57,8 @@ export default function ProductDetail() {
     }
   };
 
+  const approvedImage = data.image_review_status === "approved" ? data.image_url : null;
+
   return (
     <div className="container-page py-8">
       <Button asChild variant="ghost" size="sm" className="mb-4">
@@ -63,8 +66,8 @@ export default function ProductDetail() {
       </Button>
       <div className="grid md:grid-cols-2 gap-8">
         <div className="aspect-square rounded-2xl overflow-hidden bg-muted border">
-          {data.image_url ? (
-            <img src={data.image_url} alt={data.name} className="h-full w-full object-cover" />
+          {approvedImage ? (
+            <img src={approvedImage} alt={data.name} className="h-full w-full object-cover" />
           ) : (
             <div className="h-full w-full grid place-items-center text-muted-foreground"><Package className="h-16 w-16" /></div>
           )}
