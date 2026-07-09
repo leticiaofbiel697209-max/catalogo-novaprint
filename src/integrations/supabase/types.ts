@@ -288,6 +288,9 @@ export type Database = {
           description: string | null
           featured: boolean
           id: string
+          image_review_note: string | null
+          image_review_status: string
+          image_source_url: string | null
           image_url: string | null
           name: string
           price: number
@@ -303,6 +306,9 @@ export type Database = {
           description?: string | null
           featured?: boolean
           id?: string
+          image_review_note?: string | null
+          image_review_status?: string
+          image_source_url?: string | null
           image_url?: string | null
           name: string
           price?: number
@@ -318,6 +324,9 @@ export type Database = {
           description?: string | null
           featured?: boolean
           id?: string
+          image_review_note?: string | null
+          image_review_status?: string
+          image_source_url?: string | null
           image_url?: string | null
           name?: string
           price?: number

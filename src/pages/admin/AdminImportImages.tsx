@@ -60,7 +60,7 @@ export default function AdminImportImages() {
 
         const { error: updErr } = await supabase
           .from("products")
-          .update({ image_url: signed.signedUrl })
+          .update({ image_url: signed.signedUrl, image_review_status: "approved", image_review_note: null })
           .eq("id", prod.id);
         if (updErr) throw updErr;
         row.status = "ok";
