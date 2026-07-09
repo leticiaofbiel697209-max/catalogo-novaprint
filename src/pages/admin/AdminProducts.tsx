@@ -587,6 +587,14 @@ export default function AdminProducts() {
           {hidingNoImage ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <EyeOff className="h-4 w-4 mr-1" />}
           Ocultar sem imagem
         </Button>
+        <Button
+          variant={missingFilter === "suspicious_images" ? "default" : "outline"}
+          onClick={() => setMissingFilter(missingFilter === "suspicious_images" ? "all" : "suspicious_images")}
+          title="Filtra imagens automáticas/importadas que precisam de aprovação"
+        >
+          <ShieldAlert className="h-4 w-4 mr-1" />
+          Imagens suspeitas ({c.suspicious})
+        </Button>
       </div>
 
       <Card className={showPrices ? "border-success/40 bg-success/5" : "border-warning/40 bg-warning/5"}>
@@ -739,7 +747,7 @@ export default function AdminProducts() {
             {form.image_url && (
               <div className="sm:col-span-2">
                 <Label>Status da imagem</Label>
-                <Select value={form.image_review_status} onValueChange={(v: "approved" | "suspect" | "pending") => setForm({ ...form, image_review_status: v })}>
+                <Select value={form.image_review_status} onValueChange={(v) => setForm({ ...form, image_review_status: v as "approved" | "suspect" | "pending" })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="approved">Aprovada para aparecer no catálogo</SelectItem>
