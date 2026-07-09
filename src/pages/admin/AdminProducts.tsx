@@ -9,10 +9,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Upload, Loader2, Sparkles, ImageDown, FileSpreadsheet, Search, X, Eye, EyeOff } from "lucide-react";
+import { Plus, Pencil, Upload, Loader2, Sparkles, ImageDown, FileSpreadsheet, Search, X, Eye, EyeOff, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatBRL } from "@/lib/format";
 import { useCatalogShowPrices, setCatalogShowPrices } from "@/hooks/useCatalogPriceVisibility";
+import { Badge } from "@/components/ui/badge";
 
 
 
@@ -27,13 +28,27 @@ interface ProductForm {
   cost_price: string;
   stock: string;
   image_url: string;
+  image_review_status: "approved" | "suspect" | "pending";
   featured: boolean;
   active: boolean;
 }
 
 const empty: ProductForm = {
   name: "", code: "", brand: "", category_id: null, description: "",
-  price: "0", cost_price: "0", stock: "0", image_url: "", featured: false, active: true,
+  price: "0", cost_price: "0", stock: "0", image_url: "", image_review_status: "approved", featured: false, active: true,
+};
+
+const normalizeSearchTerm = (value: string) =>
+  value
+    .trim()
+    .replace(/[,()]/g, " ")
+    .replace(/[%_]/g, "\\$&")
+    .replace(/\s+/g, " ");
+
+const imageStatusLabel: Record<string, string> = {
+  approved: "Imagem aprovada",
+  suspect: "Imagem suspeita",
+  pending: "Revisar imagem",
 };
 
 export default function AdminProducts() {
@@ -116,11 +131,11 @@ export default function AdminProducts() {
   };
 
   const bulkFetchImages = async () => {
-    if (!confirm("Buscar imagens automaticamente para todos os produtos sem imagem? Pode levar vários minutos e a qualidade varia.")) return;
+    if (!confirm("Buscar imagens automaticamente para todos os produtos sem imagem? As novas imagens ficarão marcadas como suspeitas para aprovação manual.")) return;
     setBulkImg(true);
     try {
       const data = await callFn("fetch-product-images", {});
-      toast.success(`${data.updated} imagem(ns) vinculada(s)`);
+      toast.success(`${data.updated} imagem(ns) encontrada(s) e enviada(s) para revisão`);
       qc.invalidateQueries({ queryKey: ["admin-products"] });
     } catch (e: any) { toast.error(e.message); }
     finally { setBulkImg(false); }
@@ -141,14 +156,31 @@ export default function AdminProducts() {
     setRowBusy((s) => ({ ...s, [id]: "img" }));
     try {
       const data = await callFn("fetch-product-images", { product_ids: [id], overwrite: true });
-      if (data.updated > 0) toast.success("Imagem vinculada");
+      if (data.updated > 0) toast.success("Imagem encontrada e marcada para revisão");
       else toast.error(data.errors?.[0]?.error ?? "Não encontrei imagem");
       qc.invalidateQueries({ queryKey: ["admin-products"] });
     } catch (e: any) { toast.error(e.message); }
     finally { setRowBusy((s) => ({ ...s, [id]: null })); }
   };
 
-  const { data: products } = useQuery({
+  const updateImageReview = async (id: string, status: "approved" | "suspect" | "pending") => {
+    setRowBusy((s) => ({ ...s, [id]: "img" }));
+    try {
+      const { error } = await supabase
+        .from("products")
+        .update({
+          image_review_status: status,
+          image_review_note: status === "approved" ? null : "Marcada manualmente para revisão",
+        })
+        .eq("id", id);
+      if (error) throw error;
+      toast.success(status === "approved" ? "Imagem aprovada" : "Imagem marcada como suspeita");
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+    } catch (e: any) { toast.error(e.message); }
+    finally { setRowBusy((s) => ({ ...s, [id]: null })); }
+  };
+
+  const { data: products, error: productsError } = useQuery({
     queryKey: ["admin-products", debouncedSearch, categoryFilter, missingFilter],
     queryFn: async () => {
       let query = supabase
@@ -158,21 +190,25 @@ export default function AdminProducts() {
         .limit(500);
 
       if (categoryFilter !== "all") query = query.eq("category_id", categoryFilter);
-      if (missingFilter === "no_image") query = query.is("image_url", null);
+      if (missingFilter === "no_image") query = query.or("image_url.is.null,image_url.eq.");
       if (missingFilter === "no_description") query = query.or("description.is.null,description.eq.");
       if (missingFilter === "no_both")
-        query = query.is("image_url", null).or("description.is.null,description.eq.");
+        query = query.or("image_url.is.null,image_url.eq.").or("description.is.null,description.eq.");
       if (missingFilter === "no_any")
-        query = query.or("image_url.is.null,description.is.null,description.eq.");
+        query = query.or("image_url.is.null,image_url.eq.,description.is.null,description.eq.");
+      if (missingFilter === "suspicious_images")
+        query = query.in("image_review_status", ["suspect", "pending"]).not("image_url", "is", null);
 
       if (debouncedSearch) {
-        const terms = debouncedSearch.split(/\s+/).filter(Boolean).slice(0, 5);
-        for (const term of terms) {
-          const like = `%${term.replace(/[%_]/g, "\\$&")}%`;
-          query = query.or(
-            `name.ilike.${like},code.ilike.${like},brand.ilike.${like},description.ilike.${like}`
-          );
-        }
+        const terms = [debouncedSearch, ...debouncedSearch.split(/\s+/)]
+          .map(normalizeSearchTerm)
+          .filter(Boolean)
+          .slice(0, 8);
+        const filters = terms.flatMap((term) => {
+          const like = `%${term}%`;
+          return [`name.ilike.${like}`, `code.ilike.${like}`, `brand.ilike.${like}`, `description.ilike.${like}`];
+        });
+        query = query.or(filters.join(","));
       }
       const { data, error } = await query;
       if (error) throw error;
@@ -188,11 +224,12 @@ export default function AdminProducts() {
       const total = await supabase.from("products").select("id", { count: "exact", head: true });
       const noImg = await supabase.from("products").select("id", { count: "exact", head: true }).is("image_url", null);
       const noDesc = await supabase.from("products").select("id", { count: "exact", head: true }).or("description.is.null,description.eq.");
-      const both = await supabase.from("products").select("id", { count: "exact", head: true }).is("image_url", null).or("description.is.null,description.eq.");
-      return { total: total.count ?? 0, noImg: noImg.count ?? 0, noDesc: noDesc.count ?? 0, both: both.count ?? 0 };
+      const both = await supabase.from("products").select("id", { count: "exact", head: true }).or("image_url.is.null,image_url.eq.").or("description.is.null,description.eq.");
+      const suspicious = await supabase.from("products").select("id", { count: "exact", head: true }).in("image_review_status", ["suspect", "pending"]).not("image_url", "is", null);
+      return { total: total.count ?? 0, noImg: noImg.count ?? 0, noDesc: noDesc.count ?? 0, both: both.count ?? 0, suspicious: suspicious.count ?? 0 };
     },
   });
-  const c = counts ?? { total: 0, noImg: 0, noDesc: 0, both: 0 };
+  const c = counts ?? { total: 0, noImg: 0, noDesc: 0, both: 0, suspicious: 0 };
 
 
   const { data: categories } = useQuery({
@@ -210,6 +247,7 @@ export default function AdminProducts() {
       id: p.id, name: p.name, code: p.code ?? "", brand: p.brand ?? "",
       category_id: p.category_id, description: p.description ?? "",
       price: String(p.price), cost_price: String(cost), stock: String(p.stock), image_url: p.image_url ?? "",
+      image_review_status: p.image_review_status ?? "approved",
       featured: p.featured, active: p.active,
     });
     setOpen(true);
@@ -223,7 +261,7 @@ export default function AdminProducts() {
       if (upErr) throw upErr;
       const { data: signed, error: sErr } = await supabase.storage.from("product-images").createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
       if (sErr) throw sErr;
-      setForm((f) => ({ ...f, image_url: signed.signedUrl }));
+      setForm((f) => ({ ...f, image_url: signed.signedUrl, image_review_status: "approved" }));
       toast.success("Imagem enviada");
     } catch (e: any) {
       toast.error(e.message);
@@ -390,6 +428,9 @@ export default function AdminProducts() {
           price,
           stock,
           image_url: imageUrl || null,
+          image_review_status: imageUrl ? "suspect" : "approved",
+          image_source_url: imageUrl || null,
+          image_review_note: imageUrl ? "Imagem importada da planilha — revisar antes de aprovar" : null,
           active: true,
         };
 
@@ -451,6 +492,8 @@ export default function AdminProducts() {
         price: Number(form.price) || 0,
         stock: Number(form.stock) || 0,
         image_url: form.image_url || null,
+        image_review_status: form.image_url ? form.image_review_status : "approved",
+        image_review_note: form.image_review_status === "approved" ? null : "Marcada manualmente para revisão",
         featured: form.featured,
         active: form.active,
       };
@@ -537,6 +580,7 @@ export default function AdminProducts() {
             <SelectItem value="no_description">Sem descrição ({c.noDesc})</SelectItem>
             <SelectItem value="no_both">Sem imagem e sem descrição ({c.both})</SelectItem>
             <SelectItem value="no_any">Sem imagem ou descrição</SelectItem>
+            <SelectItem value="suspicious_images">Imagens suspeitas ({c.suspicious})</SelectItem>
           </SelectContent>
         </Select>
         <Button variant="outline" onClick={hideAllWithoutImage} disabled={hidingNoImage} title="Desativa todos os produtos que não possuem imagem">
@@ -570,6 +614,7 @@ export default function AdminProducts() {
         <CardContent className="p-0">
           <div className="px-4 py-2 text-xs text-muted-foreground border-b">
             {filteredProducts.length} produto(s)
+            {productsError && <span className="ml-2 text-destructive">Erro na busca: {(productsError as Error).message}</span>}
           </div>
           <div className="divide-y">
             {filteredProducts.map((p: any) => (
@@ -579,10 +624,18 @@ export default function AdminProducts() {
                   {p.image_url && <img src={p.image_url} className="h-full w-full object-cover" alt="" />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium line-clamp-1">{p.name}</div>
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <div className="font-medium line-clamp-1">{p.name}</div>
+                    {p.image_url && p.image_review_status !== "approved" && (
+                      <Badge variant="secondary" className="gap-1 border-warning/40 bg-warning/10 text-warning">
+                        <ShieldAlert className="h-3 w-3" /> {imageStatusLabel[p.image_review_status] ?? "Revisar imagem"}
+                      </Badge>
+                    )}
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {p.code} • {p.brand} • {p.categories?.name ?? "Sem categoria"}
                   </div>
+                  {p.image_review_note && <div className="text-xs text-warning line-clamp-1">{p.image_review_note}</div>}
                 </div>
                 <div className="text-right text-sm">
                   <div className="font-semibold text-primary">{formatBRL(p.price)}</div>
@@ -603,6 +656,16 @@ export default function AdminProducts() {
                 <Button size="icon" variant="ghost" title="Buscar imagem na web" onClick={() => fetchOneImage(p.id)} disabled={rowBusy[p.id] === "img"}>
                   {rowBusy[p.id] === "img" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageDown className="h-4 w-4" />}
                 </Button>
+                {p.image_url && p.image_review_status !== "approved" && (
+                  <Button size="sm" variant="outline" onClick={() => updateImageReview(p.id, "approved")} disabled={rowBusy[p.id] === "img"}>
+                    <CheckCircle2 className="h-4 w-4 mr-1" /> Aprovar
+                  </Button>
+                )}
+                {p.image_url && p.image_review_status === "approved" && (
+                  <Button size="icon" variant="ghost" title="Marcar imagem como suspeita" onClick={() => updateImageReview(p.id, "suspect")} disabled={rowBusy[p.id] === "img"}>
+                    <ShieldAlert className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button size="icon" variant="ghost" title="Gerar descrição com IA" onClick={() => regenDescription(p.id)} disabled={rowBusy[p.id] === "ai"}>
                   {rowBusy[p.id] === "ai" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 </Button>
@@ -673,6 +736,19 @@ export default function AdminProducts() {
               </div>
               {form.image_url && <img src={form.image_url} className="mt-2 h-24 w-24 rounded object-cover border" alt="preview" />}
             </div>
+            {form.image_url && (
+              <div className="sm:col-span-2">
+                <Label>Status da imagem</Label>
+                <Select value={form.image_review_status} onValueChange={(v: "approved" | "suspect" | "pending") => setForm({ ...form, image_review_status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="approved">Aprovada para aparecer no catálogo</SelectItem>
+                    <SelectItem value="suspect">Suspeita — ocultar até revisar</SelectItem>
+                    <SelectItem value="pending">Pendente de revisão</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <label className="flex items-center gap-2 cursor-pointer">
               <Switch checked={form.featured} onCheckedChange={(v) => setForm({ ...form, featured: v })} /> Em destaque
             </label>
