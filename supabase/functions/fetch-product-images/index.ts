@@ -28,6 +28,13 @@ const BAD_IMAGE_DOMAINS = [
   "istockphoto.com", "alamy.com", "gettyimages", "dreamstime.com", "depositphotos.com",
 ];
 
+const PREFERRED_IMAGE_DOMAINS = [
+  "hp.com", "brother.com", "epson.com", "canon.com", "xerox.com", "lexmark.com", "ricoh.com",
+  "kyocera", "samsung.com", "oki.com", "pantum.com", "kalunga.com.br", "kabum.com.br",
+  "magazineluiza.com.br", "mercadolivre.com.br", "amazon.com.br", "dell.com",
+  "multilaser.com.br", "intelbras.com",
+];
+
 const GENERIC_WORDS = new Set([
   "produto", "produtos", "compativel", "compatível", "original", "promo", "promocao", "promoção",
   "preto", "black", "branco", "colorido", "magenta", "cyan", "ciano", "yellow", "amarelo", "unidade",
@@ -71,9 +78,30 @@ function productTokens(p: ProductForImage): string[] {
     .slice(0, 12);
 }
 
+function modelTokens(p: ProductForImage): string[] {
+  const raw = [p.code, p.name].filter(Boolean).join(" ");
+  return normalizeText(raw)
+    .split(/\s+/)
+    .filter((token) =>
+      token.length >= 3 &&
+      !GENERIC_WORDS.has(token) &&
+      ((/[a-z]/.test(token) && /\d/.test(token)) || /^\d{2,}[a-z]+$/i.test(token))
+    )
+    .slice(0, 8);
+}
+
 function hasBadDomain(url: string): boolean {
   const u = url.toLowerCase();
   return BAD_IMAGE_DOMAINS.some((domain) => u.includes(domain));
+}
+
+function hasPreferredDomain(url: string): boolean {
+  const u = url.toLowerCase();
+  return PREFERRED_IMAGE_DOMAINS.some((domain) => u.includes(domain));
+}
+
+function hasProductContext(haystack: string): boolean {
+  return /toner|cartucho|cilindro|fotocondutor|drum|refil|tinta|impressora|multifuncional|papel|etiqueta|bobina|suprimento|papelaria|office|printer|ink|cartridge/.test(haystack);
 }
 
 function scoreCandidate(p: ProductForImage, candidate: Omit<ImageCandidate, "score">): number {
@@ -84,13 +112,26 @@ function scoreCandidate(p: ProductForImage, candidate: Omit<ImageCandidate, "sco
   const codeNorm = normalizeText(p.code ?? "").replace(/\s+/g, "");
   const brand = normalizeText(p.brand ?? "");
   const matched = tokens.filter((token) => haystack.includes(token));
+  const compactHaystack = haystack.replace(/\s+/g, "");
+  const matchedModels = modelTokens(p).filter((token) => compactHaystack.includes(token.replace(/\s+/g, "")));
 
   let score = matched.length;
-  if (codeNorm && codeNorm.length >= 3 && haystack.replace(/\s+/g, "").includes(codeNorm)) score += 10;
+  if (codeNorm && codeNorm.length >= 3 && compactHaystack.includes(codeNorm)) score += 10;
   if (brand && brand.length >= 3 && haystack.includes(brand)) score += 3;
-  if (/toner|cartucho|impressora|scanner|papel|refil|suprimento|informatica|papelaria|loja|comprar|preco/.test(haystack)) score += 1;
+  score += matchedModels.length * 4;
+  if (hasProductContext(haystack)) score += 2;
+  if (hasPreferredDomain(candidate.url)) score += 2;
   if (hasBadDomain(candidate.url)) score -= 6;
   if (looksNSFW(haystack)) score -= 100;
+
+  const hasStrongIdentifier =
+    (codeNorm && codeNorm.length >= 3 && compactHaystack.includes(codeNorm)) ||
+    matchedModels.length > 0;
+  const brandMatches = !brand || brand.length < 3 || haystack.includes(brand);
+
+  if (!hasProductContext(haystack)) score -= 4;
+  if (!hasStrongIdentifier && matched.length < 3) score -= 6;
+  if (!brandMatches && !hasStrongIdentifier) score -= 5;
   return score;
 }
 
@@ -99,10 +140,10 @@ function buildQueries(p: ProductForImage): string[] {
   const brand = (p.brand ?? "").trim();
   const code = (p.code ?? "").trim();
   const qs = [
-    code && brand ? `${brand} ${code}` : "",
-    code ? `"${code}" ${brand}`.trim() : "",
-    `${brand} ${name}`.trim(),
-    name,
+    code && brand ? `${brand} ${code} produto imagem` : "",
+    code ? `"${code}" ${brand} toner cartucho impressora`.trim() : "",
+    `${brand} ${name} produto`.trim(),
+    `${name} foto produto`.trim(),
   ];
   return qs
     .map((q) => q.replace(/\s+/g, " ").trim())
@@ -161,7 +202,7 @@ async function searchImage(product: ProductForImage): Promise<string | null> {
   candidates.sort((a, b) => b.score - a.score);
   const best = candidates[0];
   console.log(`[img] product=${product.name.slice(0, 50)} candidates=${candidates.length} bestScore=${best?.score ?? 0}`);
-  if (!best || best.score < 2) return null;
+  if (!best || best.score < 8) return null;
   return best.url;
 }
 

@@ -41,6 +41,7 @@ export default function ProductDetail() {
 
   const addToCart = (redirect: boolean) => {
     const approvedImage = data.image_review_status === "approved" ? data.image_url : null;
+    const outOfStock = data.stock <= 0;
     add({
       product_id: data.id,
       name: data.name,
@@ -50,14 +51,15 @@ export default function ProductDetail() {
       stock: data.stock,
     }, qty);
     if (redirect) {
-      toast.success("Adicionado ao carrinho");
+      toast.success(outOfStock ? "Incluido no orcamento" : "Adicionado ao carrinho");
       navigate("/carrinho");
     } else {
-      toast.success("Adicionado ao orçamento");
+      toast.success("Adicionado ao orcamento");
     }
   };
 
   const approvedImage = data.image_review_status === "approved" ? data.image_url : null;
+  const outOfStock = data.stock <= 0;
 
   return (
     <div className="container-page py-8">
@@ -81,7 +83,7 @@ export default function ProductDetail() {
           <h1 className="text-3xl font-bold leading-tight">{data.name}</h1>
           <div className="text-3xl font-bold text-primary"><PriceDisplay value={data.price} /></div>
           <div className="text-sm text-muted-foreground">
-            {data.stock > 0 ? `${data.stock} unidade(s) em estoque` : "Sem estoque no momento"}
+            {outOfStock ? "Sem estoque no momento - pode ser incluido no orcamento" : `${data.stock} unidade(s) em estoque`}
           </div>
           {data.description && <p className="text-foreground/80 leading-relaxed pt-2">{data.description}</p>}
 
@@ -97,11 +99,11 @@ export default function ProductDetail() {
               />
               <Button variant="ghost" size="icon" onClick={() => setQty((q) => q + 1)}><Plus className="h-4 w-4" /></Button>
             </div>
-            <Button onClick={() => addToCart(false)} variant="outline" disabled={data.stock <= 0} size="lg" className="flex-1">
+            <Button onClick={() => addToCart(false)} variant="outline" size="lg" className="flex-1">
               <FileText className="h-4 w-4 mr-2" /> Adicionar ao orçamento
             </Button>
-            <Button onClick={() => addToCart(true)} disabled={data.stock <= 0} size="lg" className="flex-1">
-              <ShoppingCart className="h-4 w-4 mr-2" /> Comprar agora
+            <Button onClick={() => addToCart(true)} size="lg" className="flex-1">
+              <ShoppingCart className="h-4 w-4 mr-2" /> {outOfStock ? "Solicitar orcamento" : "Comprar agora"}
             </Button>
           </div>
         </div>
