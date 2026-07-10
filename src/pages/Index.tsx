@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSetting } from "@/hooks/useSetting";
+import logo from "@/assets/novaprint-logo.png.asset.json";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -101,8 +102,8 @@ const Index = () => {
           </div>
           <div className="hidden md:block">
             <div className="aspect-square rounded-2xl bg-white/10 backdrop-blur border border-white/20 p-8 grid place-items-center">
-              <div className="text-center">
-                <div className="text-7xl font-black">NP</div>
+              <div className="text-center space-y-4">
+                <img src={logo.url} alt="NovaPrint Brasil" className="mx-auto max-h-40 w-auto max-w-[75%] object-contain" />
                 <div className="mt-2 text-sm text-white/70">Suprimentos & Impressão</div>
               </div>
             </div>
