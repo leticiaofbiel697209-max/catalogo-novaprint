@@ -101,11 +101,12 @@ const Index = () => {
             </div>
           </div>
           <div className="hidden md:block">
-            <div className="aspect-square rounded-2xl bg-white/10 backdrop-blur border border-white/20 p-8 grid place-items-center">
-              <div className="text-center space-y-4">
-                <img src={logo.url} alt="NovaPrint Brasil" className="mx-auto max-h-40 w-auto max-w-[75%] object-contain" />
-                <div className="mt-2 text-sm text-white/70">Suprimentos & Impressão</div>
-              </div>
+            <div className="aspect-square rounded-2xl bg-transparent border border-white/20 p-3 grid place-items-center overflow-hidden">
+              <img
+                src={logo.url}
+                alt="NovaPrint Brasil"
+                className="h-full w-full object-contain [filter:drop-shadow(0_0_12px_rgba(255,255,255,0.75))]"
+              />
             </div>
           </div>
         </div>
