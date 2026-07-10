@@ -81,77 +81,88 @@ function scoreCandidate(p: ProductForImage, candidate: Omit<ImageCandidate, "sco
   const tokens = productTokens(p);
   if (tokens.length === 0) return 0;
 
-  const code = normalizeText(p.code ?? "").replace(/\s+/g, "");
+  const codeNorm = normalizeText(p.code ?? "").replace(/\s+/g, "");
   const brand = normalizeText(p.brand ?? "");
   const matched = tokens.filter((token) => haystack.includes(token));
 
-  let score = matched.length * 2;
-  if (code && code.length >= 4 && haystack.replace(/\s+/g, "").includes(code)) score += 8;
-  if (brand && brand.length >= 3 && haystack.includes(brand)) score += 4;
-  if (/produto|comprar|loja|papelaria|toner|cartucho|impressora|scanner|papel|refil|suprimento|informatica|informática/.test(haystack)) score += 2;
-  if (hasBadDomain(candidate.url)) score -= 8;
+  let score = matched.length;
+  if (codeNorm && codeNorm.length >= 3 && haystack.replace(/\s+/g, "").includes(codeNorm)) score += 10;
+  if (brand && brand.length >= 3 && haystack.includes(brand)) score += 3;
+  if (/toner|cartucho|impressora|scanner|papel|refil|suprimento|informatica|papelaria|loja|comprar|preco/.test(haystack)) score += 1;
+  if (hasBadDomain(candidate.url)) score -= 6;
   if (looksNSFW(haystack)) score -= 100;
-
-  const minMatches = code ? 1 : Math.min(3, Math.max(2, Math.ceil(tokens.length / 4)));
-  if (matched.length < minMatches && !(code && score >= 8)) return 0;
   return score;
 }
 
 function buildQueries(p: ProductForImage): string[] {
-  const name = [p.brand, p.code, p.name].filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
-  const codeFirst = [p.brand, p.code, "produto"].filter(Boolean).join(" ");
-  const quotedCode = p.code ? `"${p.code}" ${p.brand ?? ""} produto` : "";
-  return [quotedCode, `${name} produto`, codeFirst, `${p.name} ${p.brand ?? ""} loja`]
-    .map((q) => q.trim())
+  const name = (p.name ?? "").trim();
+  const brand = (p.brand ?? "").trim();
+  const code = (p.code ?? "").trim();
+  const qs = [
+    code && brand ? `${brand} ${code}` : "",
+    code ? `"${code}" ${brand}`.trim() : "",
+    `${brand} ${name}`.trim(),
+    name,
+  ];
+  return qs
+    .map((q) => q.replace(/\s+/g, " ").trim())
     .filter((q, i, arr) => q && arr.indexOf(q) === i && !looksNSFW(q));
+}
+
+async function searchBing(query: string): Promise<Omit<ImageCandidate, "score">[]> {
+  const url = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&form=HDRSC2&first=1&safeSearch=Strict&adlt=strict`;
+  const out: Omit<ImageCandidate, "score">[] = [];
+  try {
+    const r = await fetch(url, {
+      headers: {
+        "User-Agent": UA,
+        "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
+        "Cookie": "SRCHHPGUSR=ADLT=STRICT&ADLT_SET=1",
+      },
+    });
+    if (!r.ok) return out;
+    const html = await r.text();
+    const reM = /m="([^"]+)"/g;
+    let m: RegExpExecArray | null;
+    while ((m = reM.exec(html)) !== null) {
+      try {
+        const decoded = m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&");
+        const obj = JSON.parse(decoded);
+        const item = {
+          url: String(obj.murl ?? ""),
+          title: String(obj.t ?? ""),
+          desc: String(obj.desc ?? ""),
+        };
+        if (!/^https?:\/\//i.test(item.url)) continue;
+        if (!/\.(jpe?g|png|webp)(\?|$)/i.test(item.url)) continue;
+        if (looksNSFW(`${item.title} ${item.desc} ${item.url}`) || hasBadDomain(item.url)) continue;
+        out.push(item);
+      } catch { /* ignore */ }
+      if (out.length >= 25) break;
+    }
+  } catch { /* ignore */ }
+  return out;
 }
 
 async function searchImage(product: ProductForImage): Promise<string | null> {
   const queries = buildQueries(product);
-  // Se a própria consulta contém termo suspeito, aborta
   if (queries.length === 0) return null;
-  // adlt=strict força SafeSearch estrito no Bing; cookie reforça a preferência
   const candidates: ImageCandidate[] = [];
-
   for (const query of queries) {
-    const url = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&form=HDRSC2&first=1&safeSearch=Strict&adlt=strict&cw=1177&ch=760`;
-    try {
-      const r = await fetch(url, {
-        headers: {
-          "User-Agent": UA,
-          "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
-          "Cookie": "SRCHHPGUSR=ADLT=STRICT&ADLT_SET=1",
-        },
-      });
-      if (!r.ok) continue;
-      const html = await r.text();
-      const reM = /m="([^"]+)"/g;
-      let m: RegExpExecArray | null;
-      while ((m = reM.exec(html)) !== null) {
-        try {
-          const decoded = m[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&");
-          const obj = JSON.parse(decoded);
-          const item = {
-            url: String(obj.murl ?? ""),
-            title: String(obj.t ?? ""),
-            desc: String(obj.desc ?? ""),
-          };
-          if (!/^https?:\/\//i.test(item.url)) continue;
-          if (!/\.(jpe?g|png|webp)(\?|$)/i.test(item.url)) continue;
-          if (looksNSFW(`${item.title} ${item.desc} ${item.url}`) || hasBadDomain(item.url)) continue;
-          const score = scoreCandidate(product, item);
-          if (score >= 6 && !candidates.some((c) => c.url === item.url)) candidates.push({ ...item, score });
-        } catch { /* ignore */ }
-        if (candidates.length >= 12) break;
+    const items = await searchBing(query);
+    for (const it of items) {
+      const score = scoreCandidate(product, it);
+      if (score > 0 && !candidates.some((c) => c.url === it.url)) {
+        candidates.push({ ...it, score });
       }
-    } catch {
-      continue;
     }
-    if (candidates.some((c) => c.score >= 12)) break;
+    if (candidates.some((c) => c.score >= 10)) break;
   }
-
   candidates.sort((a, b) => b.score - a.score);
-  return candidates[0]?.url ?? null;
+  const best = candidates[0];
+  console.log(`[img] product=${product.name.slice(0, 50)} candidates=${candidates.length} bestScore=${best?.score ?? 0}`);
+  if (!best || best.score < 2) return null;
+  return best.url;
 }
 
 function shouldReplaceExistingImage(url: string | null, overwrite?: boolean): boolean {
