@@ -10,6 +10,7 @@ const corsHeaders = {
 interface ReqBody {
   product_ids?: string[];
   overwrite?: boolean;
+  limit?: number;
 }
 
 Deno.serve(async (req) => {
@@ -59,7 +60,8 @@ Deno.serve(async (req) => {
     } else if (!body.overwrite) {
       query = query.or("description.is.null,description.eq.");
     }
-    const { data: products, error } = await query.limit(500);
+    const limit = Math.min(Math.max(Number(body.limit ?? 500) || 500, 1), 500);
+    const { data: products, error } = await query.limit(limit);
     if (error) throw error;
     if (!products || products.length === 0) {
       return new Response(JSON.stringify({ ok: true, updated: 0, message: "Nada para gerar" }), {
@@ -73,7 +75,7 @@ Deno.serve(async (req) => {
     for (const p of products) {
       try {
         const categoryName = (p as any).categories?.name ?? "";
-        const prompt = `Gere uma descrição comercial curta (60 a 90 palavras), em português do Brasil, para o seguinte produto de suprimentos de impressão. Foque em compatibilidade, rendimento aproximado quando aplicável, qualidade de impressão e benefícios. Não invente números específicos que não sejam comuns para o modelo. Não use markdown.\n\nNome: ${p.name}\nCódigo: ${p.code ?? "-"}\nMarca: ${p.brand ?? "-"}\nCategoria: ${categoryName}`;
+        const prompt = `Gere uma descricao comercial curta, de 55 a 85 palavras, em portugues do Brasil, para catalogo B2B de suprimentos de impressao.\n\nRegras:\n- Nao use markdown.\n- Nao invente rendimento, compatibilidade, modelos de impressora ou especificacoes que nao estejam claros no nome/codigo/marca.\n- Se for toner, cartucho, cilindro, tinta ou refil, destaque aplicacao profissional, qualidade de impressao e compatibilidade apenas pelo modelo informado.\n- Se as informacoes forem genericas, escreva de forma segura e objetiva.\n\nNome: ${p.name}\nCodigo: ${p.code ?? "-"}\nMarca: ${p.brand ?? "-"}\nCategoria: ${categoryName || "-"}`;
 
         const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
