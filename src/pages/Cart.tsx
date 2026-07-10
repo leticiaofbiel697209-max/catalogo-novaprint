@@ -47,7 +47,9 @@ export default function Cart() {
 
       <div className="grid lg:grid-cols-[1fr_360px] gap-6">
         <div className="space-y-3">
-          {items.map((i) => (
+          {items.map((i) => {
+            const outOfStock = i.stock <= 0;
+            return (
             <Card key={i.product_id}>
               <CardContent className="p-4 flex gap-4 items-center">
                 <div className="h-20 w-20 rounded-md overflow-hidden bg-muted flex-shrink-0">
@@ -57,6 +59,7 @@ export default function Cart() {
                   <Link to={`/produto/${i.product_id}`} className="font-medium hover:text-primary line-clamp-2">{i.name}</Link>
                   <div className="text-xs text-muted-foreground mt-0.5">{i.code}</div>
                   <div className="text-sm text-muted-foreground"><PriceDisplay value={i.price} /> un.</div>
+                  {outOfStock && <div className="mt-1 text-xs font-medium text-primary">Sem estoque - incluido para orcamento</div>}
                 </div>
                 <div className="flex items-center border rounded-md">
                   <Button variant="ghost" size="icon" onClick={() => setQty(i.product_id, i.quantity - 1)}><Minus className="h-4 w-4" /></Button>
@@ -71,7 +74,8 @@ export default function Cart() {
                 </Button>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
 
         <aside>
