@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import DescriptionGeneratorController from "@/components/admin/DescriptionGeneratorController";
 
 import PublicLayout from "@/components/layout/PublicLayout";
 import Index from "./pages/Index";
@@ -33,6 +34,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <DescriptionGeneratorController />
       <BrowserRouter>
         <Routes>
           <Route element={<PublicLayout />}>
