@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, Link, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, LayoutDashboard, Package, Tags, ShoppingBag, FileText, LogOut, Printer, Images, FileSpreadsheet, ShieldCheck } from "lucide-react";
+import { Loader2, LayoutDashboard, Package, Tags, ShoppingBag, FileText, LogOut, Printer, Images, FileSpreadsheet, ShieldCheck, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Session } from "@supabase/supabase-js";
 
@@ -58,6 +58,7 @@ export default function AdminLayout() {
   const nav = [
     { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
     { to: "/admin/produtos", label: "Produtos", icon: Package },
+    { to: "/admin/revisao-imagens", label: "Revisar imagens", icon: ShieldAlert },
     { to: "/admin/categorias", label: "Categorias", icon: Tags },
     { to: "/admin/pedidos", label: "Pedidos", icon: ShoppingBag },
     { to: "/admin/logs", label: "Logs", icon: FileText },
