@@ -39,7 +39,7 @@ interface DownloadedImage {
 }
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
-const MAX_RESULTS_PER_QUERY = 30;
+const MAX_RESULTS_PER_QUERY = 50;
 const DEFAULT_LIMIT = 50;
 
 const NSFW_KEYWORDS = [
@@ -123,6 +123,7 @@ function buildQueries(product: ProductForImage): string[] {
     brand ? `${brand} ${compactName}` : compactName,
     `${compactName} foto produto`,
     `${compactName} imagem fundo branco`,
+    `${compactName} catálogo`,
   ].map((query) => query.replace(/\s+/g, " ").trim())
     .filter((query, index, all) => query && all.indexOf(query) === index);
 }
@@ -143,18 +144,10 @@ function evaluateCandidate(product: ProductForImage, candidate: RawCandidate): I
   if (brand && brand.length >= 3 && haystack.includes(brand)) score += 3;
   if (hasPreferredDomain(candidate.url)) score += 2;
   if (candidate.source === "bing-json") score += 0.5;
-  if (!strongIdentifier && matchedTokens.length < 2) score -= 2;
-  if (brand && !haystack.includes(brand) && !strongIdentifier) score -= 2;
 
   const reviewReasons: string[] = [];
-  if (looksNSFW(haystack)) {
-    score -= 2;
-    reviewReasons.push("Possível conteúdo impróprio");
-  }
-  if (hasBadDomain(candidate.url)) {
-    score -= 1;
-    reviewReasons.push("Fonte não confiável");
-  }
+  if (looksNSFW(haystack)) reviewReasons.push("Possível conteúdo impróprio");
+  if (hasBadDomain(candidate.url)) reviewReasons.push("Fonte exige revisão");
   if (!strongIdentifier || matchedTokens.length < 2) reviewReasons.push("Baixa correspondência com o produto");
 
   return { ...candidate, score, reviewReasons: [...new Set(reviewReasons)] };
@@ -192,7 +185,7 @@ function parseBingHtml(html: string): RawCandidate[] {
 }
 
 async function searchBing(query: string): Promise<{ candidates: RawCandidate[]; error?: string }> {
-  const url = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&form=HDRSC2&first=1&safeSearch=Moderate&adlt=moderate`;
+  const url = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&form=HDRSC2&first=1&safeSearch=Off&adlt=off`;
   try {
     const response = await fetch(url, {
       headers: {
@@ -200,7 +193,7 @@ async function searchBing(query: string): Promise<{ candidates: RawCandidate[]; 
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
         "Cache-Control": "no-cache",
-        "Cookie": "SRCHHPGUSR=ADLT=MODERATE&ADLT_SET=1",
+        "Cookie": "SRCHHPGUSR=ADLT=OFF&ADLT_SET=1",
       },
       redirect: "follow",
       signal: AbortSignal.timeout(15000),
@@ -243,14 +236,12 @@ async function findDownloadableImage(product: ProductForImage): Promise<{ image?
     for (const raw of result.candidates) {
       if (!candidates.some((candidate) => candidate.url === raw.url)) candidates.push(evaluateCandidate(product, raw));
     }
-    if (candidates.some((candidate) => candidate.score >= 9)) break;
   }
 
   candidates.sort((a, b) => b.score - a.score);
-  const acceptable = candidates.filter((candidate) => candidate.score >= 1).slice(0, 10);
-  if (!acceptable.length) return { diagnostics: [...diagnostics, "Nenhum candidato atingiu a pontuação mínima"] };
+  if (!candidates.length) return { diagnostics: [...diagnostics, "Nenhum candidato de imagem foi encontrado"] };
 
-  for (const candidate of acceptable) {
+  for (const candidate of candidates) {
     const download = await downloadImage(candidate.url);
     if (download.image) return { image: download.image, candidate, diagnostics };
     diagnostics.push(`${candidate.url.slice(0, 100)}: ${download.error ?? "download recusado"}`);
