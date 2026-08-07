@@ -41,6 +41,7 @@ interface DownloadedImage {
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
 const MAX_RESULTS_PER_QUERY = 50;
 const DEFAULT_LIMIT = 50;
+const MIN_ACCEPTABLE_SCORE = 4.5;
 
 const NSFW_KEYWORDS = [
   "porn", "porno", "xxx", "sex", "sexo", "nude", "nudes", "naked", "erotic", "erotico", "erótico",
@@ -146,7 +147,6 @@ function evaluateCandidate(product: ProductForImage, candidate: RawCandidate): I
   if (candidate.source === "bing-json") score += 0.5;
 
   const reviewReasons: string[] = [];
-  if (looksNSFW(haystack)) reviewReasons.push("Possível conteúdo impróprio");
   if (hasBadDomain(candidate.url)) reviewReasons.push("Fonte exige revisão");
   if (!strongIdentifier || matchedTokens.length < 2) reviewReasons.push("Baixa correspondência com o produto");
 
@@ -185,7 +185,7 @@ function parseBingHtml(html: string): RawCandidate[] {
 }
 
 async function searchBing(query: string): Promise<{ candidates: RawCandidate[]; error?: string }> {
-  const url = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&form=HDRSC2&first=1&safeSearch=Off&adlt=off`;
+  const url = `https://www.bing.com/images/search?q=${encodeURIComponent(query)}&form=HDRSC2&first=1&safeSearch=Strict&adlt=strict`;
   try {
     const response = await fetch(url, {
       headers: {
@@ -193,7 +193,7 @@ async function searchBing(query: string): Promise<{ candidates: RawCandidate[]; 
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "pt-BR,pt;q=0.9,en;q=0.8",
         "Cache-Control": "no-cache",
-        "Cookie": "SRCHHPGUSR=ADLT=OFF&ADLT_SET=1",
+        "Cookie": "SRCHHPGUSR=ADLT=STRICT&ADLT_SET=1",
       },
       redirect: "follow",
       signal: AbortSignal.timeout(15000),
@@ -234,14 +234,20 @@ async function findDownloadableImage(product: ProductForImage): Promise<{ image?
     const result = await searchBing(query);
     if (result.error) diagnostics.push(`${query}: ${result.error}`);
     for (const raw of result.candidates) {
+      const rawText = `${raw.title} ${raw.desc} ${raw.url}`;
+      if (looksNSFW(rawText)) {
+        diagnostics.push(`${raw.url.slice(0, 100)}: candidato descartado por conteúdo impróprio`);
+        continue;
+      }
       if (!candidates.some((candidate) => candidate.url === raw.url)) candidates.push(evaluateCandidate(product, raw));
     }
   }
 
   candidates.sort((a, b) => b.score - a.score);
-  if (!candidates.length) return { diagnostics: [...diagnostics, "Nenhum candidato de imagem foi encontrado"] };
+  const eligible = candidates.filter((candidate) => candidate.score >= MIN_ACCEPTABLE_SCORE);
+  if (!eligible.length) return { diagnostics: [...diagnostics, "Nenhum candidato atingiu o nível mínimo de correspondência"] };
 
-  for (const candidate of candidates) {
+  for (const candidate of eligible) {
     const download = await downloadImage(candidate.url);
     if (download.image) return { image: download.image, candidate, diagnostics };
     diagnostics.push(`${candidate.url.slice(0, 100)}: ${download.error ?? "download recusado"}`);
