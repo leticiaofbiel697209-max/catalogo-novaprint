@@ -1,37 +1,42 @@
 # Security Decisions & Known Findings
 
-This file documents intentional security trade-offs and why the related linter findings are expected and accepted.
+This file documents the current security model and the remaining operational steps.
 
-## 1. Public INSERT on orders and order_items
+## 1. Checkout writes go through `submit-order`
 
-The portal accepts orders from anonymous customers. The RLS policies therefore allow `anon` and `authenticated` users to insert orders and order_items with `WITH CHECK (true)`.
+The public storefront submits checkout data through the `submit-order` Edge Function. The function fetches products again from the database and recalculates prices server-side, so client-sent prices are never trusted.
 
-- Files: `supabase/migrations/20260628*_orders*.sql`
-- Why: business requirement to let visitors complete checkout without mandatory login.
-- Trade-offs: a malicious client could theoretically send crafted fields.
-- Mitigation: checkout flow is controlled by UI code; only `total_value`, `status`, and `gestaoclick_id` are not exposed to the form. If abuse becomes a concern, we can restrict the INSERT policy to allow only `customer_name`, `customer_email`, `customer_phone`, `shipping_address`, and `notes`, and force default values for the rest.
+A migration was added at `supabase/migrations/20260807183500_harden_public_order_writes.sql` to remove direct `anon` and `authenticated` INSERT access from `customers`, `orders`, and `order_items` once applied to the Supabase project. The Edge Function uses the service role and therefore remains able to create the complete order atomically from the storefront flow.
+
+Important: repository migration state and deployed database state are separate. Confirm the migration has been applied in Supabase before considering the public INSERT policies removed in production.
 
 ## 2. Public EXECUTE on `public.has_role` security definer function
 
-The `public.has_role(uid, role)` helper is `SECURITY DEFINER` and granted to `anon` and `authenticated` so that RLS policies and client-side admin checks can determine whether a signed-in user is an admin.
+The `public.has_role(uid, role)` helper is `SECURITY DEFINER` and available to authenticated flows so RLS policies and admin checks can determine whether the signed-in user is an admin.
 
-- File: `supabase/migrations/20260628*_user_roles_and_admin.sql`
-- Why: RLS policies on `user_roles` only allow reading your own rows; `has_role` runs as postgres to read `user_roles` across all users without leaking the full table. Revoking `EXECUTE` would break the admin check and the admin layout entirely.
-- Trade-offs: the function is callable by any client, but it only returns `boolean` for the given `(uid, role)` pair and does not expose other users' data.
-- Mitigation: keep the function minimal; do not expose raw data inside it.
+- Why: RLS policies on `user_roles` only allow reading the signed-in user's own rows; `has_role` performs the role check without exposing the full table.
+- Trade-off: the function is callable but only returns a boolean.
+- Mitigation: keep the function minimal and never return role-table contents from it.
 
 ## 3. Cost price / margin isolation
 
 Internal cost prices are stored in the admin-only `product_costs` table, not in the publicly readable `products` table. The public catalog therefore cannot expose margins.
 
-- File: `supabase/migrations/20260629*_product_costs.sql`
-- Why: protect internal supplier/cost information from public visitors while still giving admins the margin data they need.
-- Trade-offs: the admin UI must fetch cost prices separately, and imports must populate both tables.
+- Why: protect internal supplier/cost information while still giving admins the margin data they need.
+- Trade-off: admin screens and imports must populate/read product costs separately.
 
 ## 4. Storage bucket `product-images`
 
-RLS policies allow public read access to product images and write access only to admins. This is intentional for the storefront.
+Catalog product images are public storefront assets, while write operations must remain restricted to admins/service-role server functions.
 
-## 5. Security linter baseline
+The automatic image function stores downloaded images in Supabase Storage and records the public URL. Manual upload should follow the same public-asset strategy rather than persisting very long-lived signed URLs; this remains a cleanup item for the product-admin refactor.
 
-After the product_costs migration, the remaining Supabase linter warnings are the expected ones listed above. No new critical findings remain. The security scan should be re-run whenever a new table or policy is added.
+## 5. Automatic product image search
+
+The repository implementation now requests strict safe search, rejects candidates containing known adult-content signals before download, and requires a minimum relevance score before an image can be accepted. Automatically found images still remain marked for manual review.
+
+Repository code and deployed Edge Function state are separate. Confirm the updated function is deployed in Supabase before considering this behavior active in production.
+
+## 6. Security linter baseline
+
+Run the Supabase security/linter checks after applying any new migration, storage-policy change, or Edge Function deployment. No security decision in this document should be treated as deployed solely because the repository contains the corresponding code.
