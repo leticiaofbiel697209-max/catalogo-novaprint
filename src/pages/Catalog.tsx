@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useSearchParams } from "react-router-dom";
 import ProductCard from "@/components/ProductCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Package, X } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
+import { fetchActiveCategories, searchActiveProducts } from "@/services/catalogService";
 
 export default function Catalog() {
   const [params, setParams] = useSearchParams();
@@ -13,10 +13,8 @@ export default function Catalog() {
   const [debounced, setDebounced] = useState(q);
   const categoryId = params.get("categoria");
 
-  // Sync local input when URL changes externally
   useEffect(() => setQ(params.get("q") ?? ""), [params]);
 
-  // Debounce keystrokes -> live search
   useEffect(() => {
     const t = setTimeout(() => {
       setDebounced(q.trim());
@@ -31,31 +29,12 @@ export default function Catalog() {
 
   const { data: categories } = useQuery({
     queryKey: ["categories"],
-    queryFn: async () => {
-      const { data } = await supabase.from("categories").select("*").eq("active", true).order("name");
-      return data ?? [];
-    },
+    queryFn: fetchActiveCategories,
   });
 
   const { data: products, isLoading } = useQuery({
     queryKey: ["products", debounced, categoryId],
-    queryFn: async () => {
-      let query = supabase.from("products").select("*").eq("active", true).order("name");
-      if (categoryId) query = query.eq("category_id", categoryId);
-      if (debounced) {
-        // Split terms — every term must match at least one field (name, code, brand, description)
-        const terms = debounced.split(/\s+/).filter(Boolean).slice(0, 6);
-        for (const term of terms) {
-          const like = `%${term.replace(/[%_]/g, "\\$&")}%`;
-          query = query.or(
-            `name.ilike.${like},code.ilike.${like},brand.ilike.${like},description.ilike.${like}`
-          );
-        }
-      }
-      const { data, error } = await query.limit(500);
-      if (error) throw error;
-      return data;
-    },
+    queryFn: () => searchActiveProducts(debounced, categoryId),
   });
 
   const activeCategoryName = useMemo(
