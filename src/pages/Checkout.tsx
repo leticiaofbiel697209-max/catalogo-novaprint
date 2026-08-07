@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCNPJ, formatPhone } from "@/lib/format";
 import PriceDisplay from "@/components/PriceDisplay";
-import { supabase } from "@/integrations/supabase/client";
+import { submitOrder } from "@/services/orderService";
 import { toast } from "sonner";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -51,22 +51,17 @@ export default function Checkout() {
   const onSubmit = async (values: FormValues) => {
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("submit-order", {
-        body: {
-          customer: {
-            name: values.name,
-            company: values.company,
-            cnpj: values.cnpj || null,
-            phone: values.phone || null,
-            email: values.email || null,
-          },
-          items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
-          notes: values.notes || null,
+      const orderId = await submitOrder({
+        customer: {
+          name: values.name,
+          company: values.company,
+          cnpj: values.cnpj || null,
+          phone: values.phone || null,
+          email: values.email || null,
         },
+        items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
+        notes: values.notes || null,
       });
-      if (error) throw error;
-      if ((data as any)?.error) throw new Error((data as any).error);
-      const orderId = (data as any).order_id;
       clear();
       navigate(`/pedido/${orderId}`);
     } catch (e: any) {
