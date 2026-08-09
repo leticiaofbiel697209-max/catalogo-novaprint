@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Loader2, WandSparkles, CheckCircle2, XCircle, StopCircle } from "lucide-react";
 import { toast } from "sonner";
 
+const productsTable = () => supabase.from("products") as any;
+
 export default function AdminCategories() {
   const qc = useQueryClient();
   const [name, setName] = useState("");
@@ -30,8 +32,7 @@ export default function AdminCategories() {
   const { data: suggestions } = useQuery({
     queryKey: ["category-suggestions"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("products")
+      const { data, error } = await productsTable()
         .select("id,name,code,brand,category_id,suggested_category_id,category_confidence,category_rule,category_review_status")
         .eq("category_review_status", "suggested")
         .is("category_id", null)
@@ -94,7 +95,7 @@ export default function AdminCategories() {
 
   const approve = async (p: any) => {
     if (!p.suggested_category_id) return;
-    const { error } = await supabase.from("products").update({
+    const { error } = await productsTable().update({
       category_id: p.suggested_category_id,
       suggested_category_id: null,
       category_review_status: "approved",
@@ -106,7 +107,7 @@ export default function AdminCategories() {
   };
 
   const reject = async (p: any) => {
-    const { error } = await supabase.from("products").update({
+    const { error } = await productsTable().update({
       suggested_category_id: null,
       category_confidence: null,
       category_rule: null,
