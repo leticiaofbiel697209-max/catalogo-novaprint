@@ -82,7 +82,12 @@ Deno.serve(async (req) => {
       byName.set(normalize(name), data.id);
     }
 
-    let query = db.from("products").select("id,name,code,brand,description,category_id").is("category_id", null).limit(limit);
+    let query = db
+      .from("products")
+      .select("id,name,code,brand,description,category_id")
+      .is("category_id", null)
+      .eq("category_review_status", "none")
+      .limit(limit);
     if (Array.isArray(body.product_ids) && body.product_ids.length) query = query.in("id", body.product_ids);
     const { data: products, error: productErr } = await query;
     if (productErr) throw productErr;
@@ -92,7 +97,11 @@ Deno.serve(async (req) => {
     for (const product of (products ?? []) as Product[]) {
       try {
         const result = classify(product);
-        if (!result) { unresolved++; continue; }
+        if (!result) {
+          unresolved++;
+          await db.from("products").update({ category_review_status: "rejected", category_rule: "Sem regra segura" }).eq("id", product.id);
+          continue;
+        }
         const categoryId = byName.get(normalize(result.category));
         if (!categoryId) { unresolved++; continue; }
         const { error } = await db.from("products").update({
@@ -108,7 +117,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    const { count: remaining } = await db.from("products").select("id", { count: "exact", head: true }).is("category_id", null).neq("category_review_status", "suggested");
+    const { count: remaining } = await db
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .is("category_id", null)
+      .eq("category_review_status", "none");
     return json({ ok: true, processed: products?.length ?? 0, suggested, unresolved, remaining: remaining ?? 0, errors });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : "Erro interno" }, 500);
