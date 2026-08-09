@@ -4,16 +4,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ImageOff, ShieldAlert, Tags, WandSparkles, FileWarning, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
+const productsTable = () => supabase.from("products") as any;
+
 export default function CatalogQualityPanel() {
   const { data, isLoading } = useQuery({
     queryKey: ["catalog-quality"],
     queryFn: async () => {
       const [noImage, imageReview, noCategory, categoryReview, noDescription] = await Promise.all([
-        supabase.from("products").select("id", { count: "exact", head: true }).or("image_url.is.null,image_url.eq."),
-        supabase.from("products").select("id", { count: "exact", head: true }).in("image_review_status", ["suspect", "pending"]),
-        supabase.from("products").select("id", { count: "exact", head: true }).is("category_id", null),
-        supabase.from("products").select("id", { count: "exact", head: true }).eq("category_review_status", "suggested"),
-        supabase.from("products").select("id", { count: "exact", head: true }).or("description.is.null,description.eq."),
+        productsTable().select("id", { count: "exact", head: true }).or("image_url.is.null,image_url.eq."),
+        productsTable().select("id", { count: "exact", head: true }).in("image_review_status", ["suspect", "pending"]),
+        productsTable().select("id", { count: "exact", head: true }).is("category_id", null),
+        productsTable().select("id", { count: "exact", head: true }).eq("category_review_status", "suggested"),
+        productsTable().select("id", { count: "exact", head: true }).or("description.is.null,description.eq."),
       ]);
       return {
         noImage: noImage.count ?? 0,
