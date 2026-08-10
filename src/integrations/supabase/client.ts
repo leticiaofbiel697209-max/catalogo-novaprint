@@ -10,10 +10,46 @@ function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith('sb_publishable_') || value.startsWith('sb_secret_');
 }
 
+function disambiguateProductsCategorySelect(input: RequestInfo | URL): RequestInfo | URL {
+  const rawUrl =
+    typeof input === 'string'
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input instanceof Request
+          ? input.url
+          : '';
+
+  if (!rawUrl || !rawUrl.includes('/rest/v1/products')) return input;
+
+  try {
+    const url = new URL(rawUrl);
+    const select = url.searchParams.get('select');
+    if (!select || !select.includes('categories(name)')) return input;
+
+    url.searchParams.set(
+      'select',
+      select.replace(
+        'categories(name)',
+        'categories:categories!products_category_id_fkey(name)',
+      ),
+    );
+
+    if (typeof input === 'string') return url.toString();
+    if (input instanceof URL) return url;
+    if (input instanceof Request) return new Request(url.toString(), input);
+  } catch {
+    return input;
+  }
+
+  return input;
+}
+
 function createSupabaseFetch(supabaseKey: string): typeof fetch {
   return (input, init) => {
+    const rewrittenInput = disambiguateProductsCategorySelect(input);
     const headers = new Headers(
-      typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined,
+      typeof Request !== 'undefined' && rewrittenInput instanceof Request ? rewrittenInput.headers : undefined,
     );
 
     if (init?.headers) {
@@ -26,7 +62,7 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
     }
 
     headers.set('apikey', supabaseKey);
-    return fetch(input, { ...init, headers });
+    return fetch(rewrittenInput, { ...init, headers });
   };
 }
 
