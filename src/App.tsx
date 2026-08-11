@@ -25,6 +25,7 @@ import AdminImportImages from "./pages/admin/AdminImportImages";
 import AdminImportProducts from "./pages/admin/AdminImportProducts";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminImageReview from "./pages/admin/AdminImageReview";
+import AdminImageDiagnostics from "./pages/admin/AdminImageDiagnostics";
 
 import NotFound from "./pages/NotFound";
 
@@ -53,6 +54,7 @@ const App = () => (
             <Route index element={<AdminDashboard />} />
             <Route path="produtos" element={<AdminProducts />} />
             <Route path="revisao-imagens" element={<AdminImageReview />} />
+            <Route path="diagnostico-imagens" element={<AdminImageDiagnostics />} />
             <Route path="categorias" element={<AdminCategories />} />
             <Route path="pedidos" element={<AdminOrders />} />
             <Route path="logs" element={<AdminLogs />} />
