@@ -20,7 +20,7 @@ export default function ProductDetail() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
-        .select("*, categories(name)")
+        .select("*, categories!products_category_id_fkey(name)")
         .eq("id", id!)
         .eq("active", true)
         .maybeSingle();
@@ -41,7 +41,6 @@ export default function ProductDetail() {
 
   const addToCart = (redirect: boolean) => {
     const approvedImage = data.image_review_status === "approved" ? data.image_url : null;
-    const outOfStock = data.stock <= 0;
     add({
       product_id: data.id,
       name: data.name,
@@ -51,10 +50,10 @@ export default function ProductDetail() {
       stock: data.stock,
     }, qty);
     if (redirect) {
-      toast.success(outOfStock ? "Incluido no orcamento" : "Adicionado ao carrinho");
+      toast.success("Adicionado ao pedido");
       navigate("/carrinho");
     } else {
-      toast.success("Adicionado ao orcamento");
+      toast.success("Adicionado ao orçamento");
     }
   };
 
@@ -83,7 +82,7 @@ export default function ProductDetail() {
           <h1 className="text-3xl font-bold leading-tight">{data.name}</h1>
           <div className="text-3xl font-bold text-primary"><PriceDisplay value={data.price} /></div>
           <div className="text-sm text-muted-foreground">
-            {outOfStock ? "Sem estoque no momento - pode ser incluido no orcamento" : `${data.stock} unidade(s) em estoque`}
+            {outOfStock ? "Disponibilidade sob consulta — adicione ao pedido e confirmamos prazo" : `${data.stock} unidade(s) disponíveis`}
           </div>
           {data.description && <p className="text-foreground/80 leading-relaxed pt-2">{data.description}</p>}
 
@@ -103,7 +102,7 @@ export default function ProductDetail() {
               <FileText className="h-4 w-4 mr-2" /> Adicionar ao orçamento
             </Button>
             <Button onClick={() => addToCart(true)} size="lg" className="flex-1">
-              <ShoppingCart className="h-4 w-4 mr-2" /> {outOfStock ? "Solicitar orcamento" : "Comprar agora"}
+              <ShoppingCart className="h-4 w-4 mr-2" /> Solicitar orçamento
             </Button>
           </div>
         </div>
