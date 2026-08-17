@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,10 +7,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CheckCircle2, ExternalLink, Loader2, RefreshCw, Search, ShieldAlert, Trash2, X } from "lucide-react";
+import { CheckCircle2, ExternalLink, ImageDown, Loader2, RefreshCw, Search, ShieldAlert, StopCircle, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 60;
+const IMAGE_BATCH_SIZE = 10;
+const MAX_IMAGE_BATCHES = 60;
 
 export default function AdminImageReview() {
   const qc = useQueryClient();
@@ -20,6 +22,15 @@ export default function AdminImageReview() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryId, setCategoryId] = useState("all");
+  const [filling, setFilling] = useState(false);
+  const [fillProgress, setFillProgress] = useState<{
+    processed: number;
+    found: number;
+    notFound: number;
+    errors: number;
+    remaining: number;
+  } | null>(null);
+  const stopFillRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 250);
@@ -93,6 +104,46 @@ export default function AdminImageReview() {
       qc.invalidateQueries({ queryKey: ["admin-products-counts"] }),
       qc.invalidateQueries({ queryKey: ["admin-catalog-quality"] }),
     ]);
+  };
+
+  const fillMissingImages = async () => {
+    if (!confirm("Buscar imagens automaticamente para produtos sem imagem? O processo roda em lotes pequenos e TODA imagem encontrada fica aguardando sua aprovação.")) return;
+
+    setFilling(true);
+    stopFillRef.current = false;
+    let totals = { processed: 0, found: 0, notFound: 0, errors: 0, remaining: 0 };
+    setFillProgress(totals);
+
+    try {
+      for (let batch = 0; batch < MAX_IMAGE_BATCHES; batch += 1) {
+        if (stopFillRef.current) break;
+
+        const { data, error } = await supabase.functions.invoke("fetch-product-images", {
+          body: { limit: IMAGE_BATCH_SIZE, onlyMissing: true },
+        });
+        if (error) throw error;
+
+        const result = data as any;
+        totals = {
+          processed: totals.processed + (result?.processed ?? 0),
+          found: totals.found + (result?.found ?? result?.updated ?? 0),
+          notFound: totals.notFound + (result?.notFound ?? 0),
+          errors: totals.errors + (result?.errors?.length ?? 0),
+          remaining: result?.remaining ?? 0,
+        };
+        setFillProgress({ ...totals });
+
+        if ((batch + 1) % 3 === 0) await refresh();
+        if ((result?.total ?? 0) === 0 || (result?.processed ?? 0) === 0 || (result?.remaining ?? 0) === 0) break;
+      }
+
+      await refresh();
+      toast.success(`Busca concluída: ${totals.found} imagem(ns) encontrada(s); ${totals.remaining} produto(s) ainda sem imagem.`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Erro ao preencher imagens");
+    } finally {
+      setFilling(false);
+    }
   };
 
   const toggleAll = (checked: boolean) => {
@@ -200,11 +251,40 @@ export default function AdminImageReview() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">Revisão de imagens</h1>
+        <h1 className="text-2xl font-bold">Central de imagens</h1>
         <p className="text-sm text-muted-foreground">
-          Imagens automáticas ficam ocultas no catálogo até você aprovar. Revise por produto, marca, código e origem.
+          Preencha produtos sem foto e aprove somente imagens conferidas. Nenhuma imagem automática aparece no catálogo antes da aprovação.
         </p>
       </div>
+
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex-1 min-w-[240px]">
+              <div className="font-semibold">Preencher produtos sem imagem</div>
+              <p className="text-xs text-muted-foreground">Busca em lotes de {IMAGE_BATCH_SIZE}; você pode parar a qualquer momento. Novas fotos entram nesta fila para revisão.</p>
+            </div>
+            <Button onClick={fillMissingImages} disabled={filling}>
+              {filling ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ImageDown className="h-4 w-4 mr-1" />}
+              Preencher imagens
+            </Button>
+            {filling && (
+              <Button variant="outline" onClick={() => { stopFillRef.current = true; toast.info("Parando após o lote atual..."); }}>
+                <StopCircle className="h-4 w-4 mr-1" /> Parar
+              </Button>
+            )}
+          </div>
+          {fillProgress && (
+            <div className="flex flex-wrap gap-2 text-xs">
+              <Badge variant="secondary">Processados: {fillProgress.processed}</Badge>
+              <Badge variant="secondary">Encontradas: {fillProgress.found}</Badge>
+              <Badge variant="secondary">Não encontradas: {fillProgress.notFound}</Badge>
+              <Badge variant={fillProgress.errors ? "destructive" : "secondary"}>Erros: {fillProgress.errors}</Badge>
+              <Badge variant="outline">Ainda sem imagem: {fillProgress.remaining}</Badge>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent className="p-4 space-y-3">
