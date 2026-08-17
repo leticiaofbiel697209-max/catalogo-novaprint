@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSetting } from "@/hooks/useSetting";
+import { fetchActiveCategories } from "@/services/catalogService";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -18,12 +19,8 @@ const Index = () => {
   const bannerImage = useSetting("home_banner_image");
 
   const { data: categories } = useQuery({
-    queryKey: ["home-categories"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("categories").select("*").eq("active", true).order("name");
-      if (error) throw error;
-      return data;
-    },
+    queryKey: ["home-categories-with-products"],
+    queryFn: fetchActiveCategories,
   });
 
   const { data: featured } = useQuery({
