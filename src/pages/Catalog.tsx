@@ -1,11 +1,13 @@
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import ProductCard from "@/components/ProductCard";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Package, X } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
-import { fetchActiveCategories, searchActiveProducts } from "@/services/catalogService";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { fetchActiveCategories, searchActiveProductsPage } from "@/services/catalogService";
+
+const PAGE_SIZE = 48;
 
 export default function Catalog() {
   const [params, setParams] = useSearchParams();
@@ -28,14 +30,48 @@ export default function Catalog() {
   }, [q]);
 
   const { data: categories } = useQuery({
-    queryKey: ["categories"],
+    queryKey: ["categories-with-products"],
     queryFn: fetchActiveCategories,
   });
 
-  const { data: products, isLoading } = useQuery({
+  const {
+    data: pages,
+    isLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
     queryKey: ["products", debounced, categoryId],
-    queryFn: () => searchActiveProducts(debounced, categoryId),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => searchActiveProductsPage(debounced, categoryId, Number(pageParam), PAGE_SIZE),
+    getNextPageParam: (lastPage) => {
+      const loaded = (lastPage.page + 1) * lastPage.pageSize;
+      return loaded < lastPage.count ? lastPage.page + 1 : undefined;
+    },
   });
+
+  const products = useMemo(() => pages?.pages.flatMap((page) => page.items) ?? [], [pages]);
+  const totalCount = pages?.pages[0]?.count ?? 0;
+
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const loadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  useEffect(() => {
+    const element = sentinelRef.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { rootMargin: "600px" },
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   const activeCategoryName = useMemo(
     () => categories?.find((c) => c.id === categoryId)?.name,
@@ -133,11 +169,23 @@ export default function Catalog() {
                 <div key={i} className="aspect-[4/5] rounded-xl bg-muted animate-pulse" />
               ))}
             </div>
-          ) : products && products.length > 0 ? (
+          ) : products.length > 0 ? (
             <>
-              <div className="text-sm text-muted-foreground mb-3">{products.length} produto(s)</div>
+              <div className="text-sm text-muted-foreground mb-3">
+                Mostrando {products.length} de {totalCount} produto(s)
+              </div>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                 {products.map((p) => <ProductCard key={p.id} product={p as any} />)}
+              </div>
+              <div ref={sentinelRef} className="h-1" />
+              <div className="py-8 text-center">
+                {isFetchingNextPage ? (
+                  <span className="text-sm text-muted-foreground">Carregando mais produtos...</span>
+                ) : hasNextPage ? (
+                  <Button variant="outline" onClick={() => fetchNextPage()}>Carregar mais</Button>
+                ) : (
+                  <span className="text-sm text-muted-foreground">Fim da lista — {totalCount} produto(s)</span>
+                )}
               </div>
             </>
           ) : (
