@@ -11,6 +11,7 @@ interface ReqBody {
   product_ids?: string[];
   overwrite?: boolean;
   limit?: number;
+  onlyMissing?: boolean;
 }
 
 interface ProductForImage {
@@ -19,6 +20,8 @@ interface ProductForImage {
   code: string | null;
   brand: string | null;
   image_url: string | null;
+  image_review_status?: string | null;
+  image_rejected_sources?: string[] | null;
 }
 
 interface RawCandidate {
@@ -30,7 +33,6 @@ interface RawCandidate {
 
 interface ImageCandidate extends RawCandidate {
   score: number;
-  reviewReasons: string[];
 }
 
 interface DownloadedImage {
@@ -39,9 +41,8 @@ interface DownloadedImage {
 }
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
-const MAX_RESULTS_PER_QUERY = 50;
+const MAX_RESULTS_PER_QUERY = 30;
 const DEFAULT_LIMIT = 50;
-const MIN_ACCEPTABLE_SCORE = 4.5;
 
 const NSFW_KEYWORDS = [
   "porn", "porno", "xxx", "sex", "sexo", "nude", "nudes", "naked", "erotic", "erotico", "erótico",
@@ -75,19 +76,50 @@ function clean(value?: string | null): string {
 }
 
 function normalizeText(value: string): string {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 function decodeHtml(value: string): string {
   return value
-    .replace(/&quot;/g, '"').replace(/&#34;/g, '"').replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'")
-    .replace(/\\u002f/gi, "/").replace(/\\\//g, "/");
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&#39;/g, "'")
+    .replace(/\\u002f/gi, "/")
+    .replace(/\\\//g, "/");
 }
+
+const NSFW_DOMAIN_HINTS = [
+  "xvideos", "xnxx", "xhamster", "redtube", "pornhub", "youporn", "onlyfans", "bongacams",
+  "chaturbate", "camsoda", "stripchat", "erome", "rule34", "nhentai", "hanime", "sexo", "porno",
+];
 
 function looksNSFW(text: string): boolean {
   const normalized = normalizeText(text);
-  return NSFW_KEYWORDS.some((keyword) => normalized.includes(normalizeText(keyword)));
+  const compact = normalized.replace(/\s+/g, "");
+  if (NSFW_DOMAIN_HINTS.some((hint) => compact.includes(hint))) return true;
+  return NSFW_KEYWORDS.some((keyword) => {
+    const term = normalizeText(keyword);
+    if (!term) return false;
+    return new RegExp(`(^|\\s)${term}(\\s|$)`).test(normalized);
+  });
+}
+
+const GENERIC_IMAGE_HINTS = [
+  "logo", "logotipo", "icon", "icone", "favicon", "banner", "placeholder", "no-image", "sem-imagem",
+  "thumb-default", "default-image", "sprite", "watermark", "marca-dagua",
+];
+
+function looksGenericImage(url: string, title: string): boolean {
+  const haystack = `${url} ${title}`.toLowerCase();
+  return GENERIC_IMAGE_HINTS.some((hint) => haystack.includes(hint));
 }
 
 function hasBadDomain(url: string): boolean {
@@ -100,13 +132,21 @@ function hasPreferredDomain(url: string): boolean {
   return PREFERRED_IMAGE_DOMAINS.some((domain) => normalized.includes(domain));
 }
 
+function hasProductContext(text: string): boolean {
+  return /toner|cartucho|cilindro|fotocondutor|drum|refil|tinta|impressora|multifuncional|papel|etiqueta|bobina|suprimento|papelaria|office|printer|ink|cartridge|mouse|teclado|monitor|notebook|memoria|memória|ssd|hd|cabo|adaptador|headset|webcam|roteador|informatica|informática|limpeza|detergente|desinfetante|alcool|álcool|saco|lixeira|esponja|vassoura|rodo|caneta|lapis|lápis|grampeador|grampo|pasta|arquivo|caderno|envelope|garrafa|termica|térmica|copo|crachá|cracha/.test(text);
+}
+
 function productTokens(product: ProductForImage): string[] {
-  return normalizeText([product.brand, product.code, product.name].filter(Boolean).join(" "))
-    .split(/\s+/).filter((token) => token.length >= 3 && !GENERIC_WORDS.has(token)).slice(0, 16);
+  const raw = [product.brand, product.code, product.name].filter(Boolean).join(" ");
+  return normalizeText(raw)
+    .split(/\s+/)
+    .filter((token) => token.length >= 3 && !GENERIC_WORDS.has(token))
+    .slice(0, 16);
 }
 
 function modelTokens(product: ProductForImage): string[] {
-  return normalizeText([product.code, product.name].filter(Boolean).join(" "))
+  const raw = [product.code, product.name].filter(Boolean).join(" ");
+  return normalizeText(raw)
     .split(/\s+/)
     .filter((token) => token.length >= 3 && !GENERIC_WORDS.has(token))
     .filter((token) => (/[a-z]/.test(token) && /\d/.test(token)) || /^\d{2,}[a-z]+$/i.test(token))
@@ -118,18 +158,20 @@ function buildQueries(product: ProductForImage): string[] {
   const brand = clean(product.brand);
   const code = clean(product.code);
   const compactName = name.split(/\s+/).slice(0, 12).join(" ");
-  return [
+  const queries = [
     code && brand ? `"${brand}" "${code}"` : "",
     code ? `"${code}" ${brand} produto` : "",
     brand ? `${brand} ${compactName}` : compactName,
     `${compactName} foto produto`,
     `${compactName} imagem fundo branco`,
-    `${compactName} catálogo`,
-  ].map((query) => query.replace(/\s+/g, " ").trim())
-    .filter((query, index, all) => query && all.indexOf(query) === index);
+  ];
+
+  return queries
+    .map((query) => query.replace(/\s+/g, " ").trim())
+    .filter((query, index, all) => query && all.indexOf(query) === index && !looksNSFW(query));
 }
 
-function evaluateCandidate(product: ProductForImage, candidate: RawCandidate): ImageCandidate {
+function scoreCandidate(product: ProductForImage, candidate: RawCandidate): number {
   const haystack = normalizeText(`${candidate.title} ${candidate.desc} ${candidate.url}`);
   const compactHaystack = haystack.replace(/\s+/g, "");
   const tokens = productTokens(product);
@@ -138,49 +180,82 @@ function evaluateCandidate(product: ProductForImage, candidate: RawCandidate): I
   const matchedModels = models.filter((token) => compactHaystack.includes(token.replace(/\s+/g, "")));
   const code = normalizeText(product.code ?? "").replace(/\s+/g, "");
   const brand = normalizeText(product.brand ?? "");
-  const strongIdentifier = Boolean(code && code.length >= 3 && compactHaystack.includes(code)) || matchedModels.length > 0;
 
-  let score = matchedTokens.length * 1.25 + matchedModels.length * 4;
-  if (code && code.length >= 3 && compactHaystack.includes(code)) score += 9;
-  if (brand && brand.length >= 3 && haystack.includes(brand)) score += 3;
-  if (hasPreferredDomain(candidate.url)) score += 2;
+  let score = matchedTokens.length * 1.25;
+  if (code && code.length >= 3 && compactHaystack.includes(code)) score += 14;
+  if (brand && brand.length >= 3 && haystack.includes(brand)) score += 4;
+  score += matchedModels.length * 6;
+  if (hasProductContext(haystack)) score += 1.5;
+  if (hasPreferredDomain(candidate.url)) score += 3;
   if (candidate.source === "bing-json") score += 0.5;
+  if (hasBadDomain(candidate.url)) score -= 8;
+  if (looksGenericImage(candidate.url, `${candidate.title} ${candidate.desc}`)) score -= 6;
+  if (looksNSFW(haystack)) score -= 100;
 
-  const reviewReasons: string[] = [];
-  if (hasBadDomain(candidate.url)) reviewReasons.push("Fonte exige revisão");
-  if (!strongIdentifier || matchedTokens.length < 2) reviewReasons.push("Baixa correspondência com o produto");
+  const hasStrongIdentifier =
+    Boolean(code && code.length >= 3 && compactHaystack.includes(code)) || matchedModels.length > 0;
 
-  return { ...candidate, score, reviewReasons: [...new Set(reviewReasons)] };
+  if (!hasStrongIdentifier && matchedTokens.length < 2) score -= 3;
+  if (brand && !haystack.includes(brand) && !hasStrongIdentifier) score -= 3;
+
+  return score;
 }
 
 function addCandidate(target: RawCandidate[], candidate: RawCandidate): void {
   const url = clean(candidate.url);
-  if (!/^https?:\/\//i.test(url) || url.startsWith("data:")) return;
+  if (!/^https?:\/\//i.test(url)) return;
+  if (url.startsWith("data:")) return;
+  if (hasBadDomain(url) || looksNSFW(`${candidate.title} ${candidate.desc} ${url}`)) return;
   if (target.some((item) => item.url === url)) return;
   target.push({ ...candidate, url });
 }
 
 function parseBingHtml(html: string): RawCandidate[] {
   const candidates: RawCandidate[] = [];
+
   const metadataRegex = /\bm=["']([^"']+)["']/g;
   let metadataMatch: RegExpExecArray | null;
   while ((metadataMatch = metadataRegex.exec(html)) !== null && candidates.length < MAX_RESULTS_PER_QUERY) {
     try {
-      const data = JSON.parse(decodeHtml(metadataMatch[1]));
+      const decoded = decodeHtml(metadataMatch[1]);
+      const data = JSON.parse(decoded);
       addCandidate(candidates, {
         url: String(data.murl ?? data.mediaUrl ?? ""),
         title: String(data.t ?? data.title ?? ""),
         desc: String(data.desc ?? data.description ?? ""),
         source: "bing-json",
       });
-    } catch { /* ignora metadado inválido */ }
+    } catch {
+      // Ignora blocos que não sejam JSON válido.
+    }
   }
 
   const jsonUrlRegex = /["'](?:murl|mediaUrl)["']\s*:\s*["']([^"']+)["']/gi;
   let jsonUrlMatch: RegExpExecArray | null;
   while ((jsonUrlMatch = jsonUrlRegex.exec(html)) !== null && candidates.length < MAX_RESULTS_PER_QUERY) {
-    addCandidate(candidates, { url: decodeHtml(jsonUrlMatch[1]), title: "", desc: "", source: "bing-fallback-json" });
+    addCandidate(candidates, {
+      url: decodeHtml(jsonUrlMatch[1]),
+      title: "",
+      desc: "",
+      source: "bing-fallback-json",
+    });
   }
+
+  const imageUrlRegex = /(?:mediaurl|imgurl|imageurl)=([^&"'\s]+)/gi;
+  let imageUrlMatch: RegExpExecArray | null;
+  while ((imageUrlMatch = imageUrlRegex.exec(html)) !== null && candidates.length < MAX_RESULTS_PER_QUERY) {
+    try {
+      addCandidate(candidates, {
+        url: decodeURIComponent(decodeHtml(imageUrlMatch[1])),
+        title: "",
+        desc: "",
+        source: "bing-querystring",
+      });
+    } catch {
+      // Ignora URL malformada.
+    }
+  }
+
   return candidates;
 }
 
@@ -198,125 +273,275 @@ async function searchBing(query: string): Promise<{ candidates: RawCandidate[]; 
       redirect: "follow",
       signal: AbortSignal.timeout(15000),
     });
-    if (!response.ok) return { candidates: [], error: `Bing HTTP ${response.status}` };
+
+    if (!response.ok) {
+      return { candidates: [], error: `Bing HTTP ${response.status}` };
+    }
+
     const html = await response.text();
-    if (/captcha|unusual traffic|verify you are human/i.test(html)) return { candidates: [], error: "Bing bloqueou temporariamente a consulta" };
+    if (/captcha|unusual traffic|verify you are human/i.test(html)) {
+      return { candidates: [], error: "Bing bloqueou temporariamente a consulta" };
+    }
+
     const candidates = parseBingHtml(html);
-    return { candidates, error: candidates.length ? undefined : "Bing não retornou URLs de imagem reconhecíveis" };
+    return {
+      candidates,
+      error: candidates.length === 0 ? "Bing não retornou URLs de imagem reconhecíveis" : undefined,
+    };
   } catch (error) {
-    return { candidates: [], error: error instanceof Error ? error.message : "Falha ao consultar Bing" };
+    const message = error instanceof Error ? error.message : "Falha ao consultar Bing";
+    return { candidates: [], error: message };
   }
 }
 
 async function downloadImage(url: string): Promise<{ image?: DownloadedImage; error?: string }> {
   try {
     const response = await fetch(url, {
-      headers: { "User-Agent": UA, "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8", "Referer": new URL(url).origin },
+      headers: {
+        "User-Agent": UA,
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+        "Referer": new URL(url).origin,
+      },
       redirect: "follow",
       signal: AbortSignal.timeout(15000),
     });
+
     if (!response.ok) return { error: `Download HTTP ${response.status}` };
+
     const contentType = (response.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
     if (!contentType.startsWith("image/")) return { error: `Conteúdo recebido não é imagem (${contentType || "sem tipo"})` };
+
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.byteLength < 1000) return { error: "Imagem muito pequena" };
     if (bytes.byteLength > 8_000_000) return { error: "Imagem maior que 8 MB" };
+
     return { image: { bytes, contentType } };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Falha no download" };
   }
 }
 
-async function findDownloadableImage(product: ProductForImage): Promise<{ image?: DownloadedImage; candidate?: ImageCandidate; diagnostics: string[] }> {
+async function findDownloadableImage(product: ProductForImage, excluded: Set<string> = new Set()): Promise<{
+  image?: DownloadedImage;
+  sourceUrl?: string;
+  diagnostics: string[];
+}> {
   const diagnostics: string[] = [];
   const candidates: ImageCandidate[] = [];
+
   for (const query of buildQueries(product)) {
     const result = await searchBing(query);
     if (result.error) diagnostics.push(`${query}: ${result.error}`);
+
     for (const raw of result.candidates) {
-      const rawText = `${raw.title} ${raw.desc} ${raw.url}`;
-      if (looksNSFW(rawText)) {
-        diagnostics.push(`${raw.url.slice(0, 100)}: candidato descartado por conteúdo impróprio`);
-        continue;
+      if (excluded.has(raw.url)) continue;
+      const score = scoreCandidate(product, raw);
+      if (score > 0 && !candidates.some((candidate) => candidate.url === raw.url)) {
+        candidates.push({ ...raw, score });
       }
-      if (!candidates.some((candidate) => candidate.url === raw.url)) candidates.push(evaluateCandidate(product, raw));
     }
+
+    if (candidates.some((candidate) => candidate.score >= 14)) break;
   }
 
   candidates.sort((a, b) => b.score - a.score);
-  const eligible = candidates.filter((candidate) => candidate.score >= MIN_ACCEPTABLE_SCORE);
-  if (!eligible.length) return { diagnostics: [...diagnostics, "Nenhum candidato atingiu o nível mínimo de correspondência"] };
+  const models = modelTokens(product);
+  const minimumScore = models.length > 0 ? 7 : 5;
+  const acceptable = candidates.filter((candidate) => candidate.score >= minimumScore).slice(0, 8);
 
-  for (const candidate of eligible) {
+  if (acceptable.length === 0) {
+    diagnostics.push(`Nenhum candidato atingiu a pontuação mínima ${minimumScore}`);
+    return { diagnostics };
+  }
+
+  for (const candidate of acceptable) {
     const download = await downloadImage(candidate.url);
-    if (download.image) return { image: download.image, candidate, diagnostics };
+    if (download.image) {
+      return { image: download.image, sourceUrl: candidate.url, diagnostics };
+    }
     diagnostics.push(`${candidate.url.slice(0, 100)}: ${download.error ?? "download recusado"}`);
   }
-  return { diagnostics: [...diagnostics, "Todos os candidatos encontrados recusaram o download"] };
+
+  diagnostics.push("Todos os candidatos encontrados recusaram o download");
+  return { diagnostics };
 }
 
 function extensionFromContentType(contentType: string): string {
-  const normalized = (contentType.split("/")[1] ?? "jpeg").split("+")[0].split(";")[0].toLowerCase();
+  const subtype = contentType.split("/")[1] ?? "jpeg";
+  const normalized = subtype.split("+")[0].split(";")[0].toLowerCase();
   if (normalized === "jpeg") return "jpg";
-  return ["png", "webp", "gif", "avif"].includes(normalized) ? normalized : "jpg";
+  if (["png", "webp", "gif", "svg+xml", "avif"].includes(normalized)) {
+    return normalized === "svg+xml" ? "svg" : normalized;
+  }
+  return "jpg";
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
   try {
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const authClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
-    const { data: { user } } = await authClient.auth.getUser();
-    if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const { data: roleRow } = await authClient.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
-    if (!roleRow) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user } } = await authClient.auth.getUser();
+    if (!user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: roleRow } = await authClient
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .maybeSingle();
+
+    if (!roleRow) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const body: ReqBody = await req.json().catch(() => ({}));
-    const db = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const limit = Math.min(Math.max(Number(body.limit ?? DEFAULT_LIMIT) || DEFAULT_LIMIT, 1), 100);
-    let query = db.from("products").select("id, name, code, brand, image_url");
-    if (body.product_ids?.length) query = query.in("id", body.product_ids);
-    else if (!body.overwrite) query = query.or("image_url.is.null,image_url.eq.");
+    const db = createClient(supabaseUrl, supabaseServiceKey);
+    const limit = Math.min(Math.max(Number(body.limit ?? DEFAULT_LIMIT) || DEFAULT_LIMIT, 1), 25);
+    const isManual = Boolean(body.product_ids?.length);
+
+    const columns = "id, name, code, brand, image_url, image_review_status, image_rejected_sources";
+    let query = db.from("products").select(columns);
+    if (isManual) {
+      query = query.in("id", body.product_ids!);
+    } else {
+      query = query.or("image_url.is.null,image_url.eq.");
+    }
 
     const { data: products, error: productsError } = await query.limit(limit);
     if (productsError) throw productsError;
 
+    const { count: remainingCount } = isManual
+      ? { count: null as number | null }
+      : await db.from("products").select("id", { count: "exact", head: true }).or("image_url.is.null,image_url.eq.");
+
+    if (!products?.length) {
+      return new Response(JSON.stringify({
+        ok: true, updated: 0, total: 0, processed: 0, found: 0, notFound: 0,
+        remaining: remainingCount ?? 0, errors: [], message: "Nada para buscar",
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     let updated = 0;
-    const errors: unknown[] = [];
-    for (const product of (products ?? []) as ProductForImage[]) {
+    let processed = 0;
+    let skipped = 0;
+    const errors: { id: string; product: string; error: string; diagnostics?: string[] }[] = [];
+
+    for (const product of products as ProductForImage[]) {
       try {
-        if (!body.overwrite && clean(product.image_url)) continue;
-        const result = await findDownloadableImage(product);
-        if (!result.image || !result.candidate) {
-          errors.push({ id: product.id, product: product.name, error: "Nenhuma imagem válida encontrada", diagnostics: result.diagnostics.slice(0, 6) });
+        const hasImage = Boolean(clean(product.image_url));
+        const isApproved = (product.image_review_status ?? "approved") === "approved";
+
+        if (hasImage && isApproved && !(isManual && body.overwrite)) { skipped += 1; continue; }
+        if (hasImage && !isManual) { skipped += 1; continue; }
+
+        processed += 1;
+        const excluded = new Set((product.image_rejected_sources ?? []).filter(Boolean));
+        const result = await findDownloadableImage(product, excluded);
+        if (!result.image || !result.sourceUrl) {
+          errors.push({
+            id: product.id,
+            product: product.name,
+            error: "Nenhuma imagem válida encontrada",
+            diagnostics: result.diagnostics.slice(0, 6),
+          });
           continue;
         }
 
-        const path = `auto/${product.id}.${extensionFromContentType(result.image.contentType)}`;
-        const { error: uploadError } = await db.storage.from("product-images").upload(path, result.image.bytes, { contentType: result.image.contentType, upsert: true, cacheControl: "31536000" });
-        if (uploadError) throw uploadError;
-        const { data: publicData } = db.storage.from("product-images").getPublicUrl(path);
-        const reasons = result.candidate.reviewReasons.length ? result.candidate.reviewReasons : ["Imagem encontrada automaticamente — revisar antes de aprovar"];
+        const extension = extensionFromContentType(result.image.contentType);
+        const path = `auto/${product.id}.${extension}`;
+        const { error: uploadError } = await db.storage.from("product-images").upload(path, result.image.bytes, {
+          contentType: result.image.contentType,
+          upsert: true,
+          cacheControl: "31536000",
+        });
+        if (uploadError) {
+          errors.push({ id: product.id, product: product.name, error: `Falha ao salvar imagem: ${uploadError.message}` });
+          continue;
+        }
 
-        const { error: updateError } = await db.from("products").update({
-          image_url: publicData.publicUrl,
-          image_source_url: result.candidate.url,
-          image_review_status: "suspect",
-          image_review_note: reasons.join("; "),
-        }).eq("id", product.id);
-        if (updateError) throw updateError;
+        const { data: publicData } = db.storage.from("product-images").getPublicUrl(path);
+        let imageUrl = publicData.publicUrl;
+
+        if (!imageUrl) {
+          const { data: signed, error: signedError } = await db.storage
+            .from("product-images")
+            .createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+          if (signedError) {
+            errors.push({ id: product.id, product: product.name, error: `Falha ao gerar URL: ${signedError.message}` });
+            continue;
+          }
+          imageUrl = signed.signedUrl;
+        }
+
+        const displayUrl = `${imageUrl}${imageUrl.includes("?") ? "&" : "?"}v=${Date.now()}`;
+
+        const { error: updateError } = await db
+          .from("products")
+          .update({
+            image_url: displayUrl,
+            image_source_url: result.sourceUrl,
+            image_review_status: "suspect",
+            image_review_note: "Imagem encontrada automaticamente — aprove antes de publicar",
+          })
+          .eq("id", product.id);
+
+        if (updateError) {
+          errors.push({ id: product.id, product: product.name, error: `Falha ao atualizar produto: ${updateError.message}` });
+          continue;
+        }
+
         updated += 1;
+        await new Promise((resolve) => setTimeout(resolve, 250));
       } catch (error) {
-        errors.push({ id: product.id, product: product.name, error: error instanceof Error ? error.message : "Erro desconhecido" });
+        errors.push({
+          id: product.id,
+          product: product.name,
+          error: error instanceof Error ? error.message : "Erro desconhecido",
+        });
       }
     }
 
-    return new Response(JSON.stringify({ ok: true, updated, total: products?.length ?? 0, failed: errors.length, errors }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({
+      ok: true,
+      updated,
+      found: updated,
+      notFound: errors.length,
+      processed,
+      skipped,
+      total: products.length,
+      failed: errors.length,
+      remaining: Math.max((remainingCount ?? 0) - updated, 0),
+      errors,
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Erro desconhecido" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Erro desconhecido" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
