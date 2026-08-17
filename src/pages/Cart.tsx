@@ -59,7 +59,7 @@ export default function Cart() {
                   <Link to={`/produto/${i.product_id}`} className="font-medium hover:text-primary line-clamp-2">{i.name}</Link>
                   <div className="text-xs text-muted-foreground mt-0.5">{i.code}</div>
                   <div className="text-sm text-muted-foreground"><PriceDisplay value={i.price} /> un.</div>
-                  {outOfStock && <div className="mt-1 text-xs font-medium text-primary">Sem estoque - incluido para orcamento</div>}
+                  {outOfStock && <div className="mt-1 text-xs font-medium text-primary">Disponibilidade sob consulta</div>}
                 </div>
                 <div className="flex items-center border rounded-md">
                   <Button variant="ghost" size="icon" onClick={() => setQty(i.product_id, i.quantity - 1)}><Minus className="h-4 w-4" /></Button>
@@ -94,7 +94,7 @@ export default function Cart() {
                 <Link to="/checkout">Finalizar pedido <ArrowRight className="h-4 w-4 ml-1" /></Link>
               </Button>
               <Button asChild variant="outline" className="w-full">
-                <Link to="/catalogo">Continuar comprando</Link>
+                <Link to="/catalogo">Continuar adicionando itens</Link>
               </Button>
             </CardContent>
           </Card>
