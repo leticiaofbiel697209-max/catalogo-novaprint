@@ -2,10 +2,9 @@ import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import PriceDisplay from "@/components/PriceDisplay";
-import { ShoppingCart, Package, FileText } from "lucide-react";
+import { ShoppingCart, Package } from "lucide-react";
 import { useCart } from "@/store/cart";
 import { toast } from "sonner";
-
 
 export interface ProductCardProps {
   product: {
@@ -24,6 +23,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const add = useCart((s) => s.add);
   const approvedImage = product.image_review_status === "approved" ? product.image_url : null;
   const outOfStock = product.stock <= 0;
+
   const handleAdd = () => {
     add({
       product_id: product.id,
@@ -33,8 +33,9 @@ export default function ProductCard({ product }: ProductCardProps) {
       image_url: approvedImage,
       stock: product.stock,
     });
-    toast.success(outOfStock ? `${product.name} incluido para orcamento` : `${product.name} adicionado ao carrinho`);
+    toast.success(`${product.name} adicionado ao pedido`);
   };
+
   return (
     <Card className="group overflow-hidden border-border/60 hover:border-primary/40 hover:shadow-[var(--shadow-md)] transition-all">
       <Link to={`/produto/${product.id}`} className="block aspect-square overflow-hidden bg-muted">
@@ -63,16 +64,11 @@ export default function ProductCard({ product }: ProductCardProps) {
           <div>
             <div className="text-lg font-bold text-primary"><PriceDisplay value={product.price} /></div>
             <div className="text-xs text-muted-foreground">
-              {outOfStock ? "Sem estoque - sob orcamento" : `Estoque: ${product.stock}`}
+              {outOfStock ? "Disponibilidade sob consulta" : `Disponível: ${product.stock}`}
             </div>
           </div>
-          <Button
-            size="sm"
-            onClick={handleAdd}
-            variant={outOfStock ? "outline" : "default"}
-            title={outOfStock ? "Incluir no orcamento" : "Adicionar ao carrinho"}
-          >
-            {outOfStock ? <FileText className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+          <Button size="sm" onClick={handleAdd} title="Adicionar ao pedido">
+            <ShoppingCart className="h-4 w-4" />
           </Button>
         </div>
       </CardContent>
