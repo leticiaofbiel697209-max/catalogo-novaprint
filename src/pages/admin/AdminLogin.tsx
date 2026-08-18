@@ -18,12 +18,32 @@ export default function AdminLogin() {
   const [message, setMessage] = useState("");
   const [mode, setMode] = useState<"signin" | "request">("signin");
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate("/admin", { replace: true });
     });
   }, [navigate]);
+
+  const sendPasswordReset = async () => {
+    const target = email.trim().toLowerCase();
+    if (!target) {
+      toast.error("Informe seu e-mail primeiro.");
+      return;
+    }
+    setResetting(true);
+    try {
+      const redirectTo = `${window.location.origin}/admin/redefinir-senha`;
+      const { error } = await supabase.auth.resetPasswordForEmail(target, { redirectTo });
+      if (error) throw error;
+      toast.success("E-mail de redefinição enviado. Confira sua caixa de entrada e o spam.");
+    } catch (e: any) {
+      toast.error(e.message ?? "Não foi possível enviar o e-mail de redefinição.");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +105,12 @@ export default function AdminLogin() {
             </div>
             {mode === "signin" && (
               <div>
-                <Label htmlFor="password">Senha</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="password">Senha</Label>
+                  <button type="button" onClick={sendPasswordReset} disabled={resetting} className="text-xs text-primary hover:underline disabled:opacity-50">
+                    {resetting ? "Enviando..." : "Esqueci minha senha"}
+                  </button>
+                </div>
                 <Input id="password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
             )}
