@@ -15,6 +15,7 @@ import OrderConfirmation from "./pages/OrderConfirmation";
 import Login from "./pages/Login";
 
 import AdminLogin from "./pages/admin/AdminLogin";
+import AdminResetPassword from "./pages/admin/AdminResetPassword";
 import AdminLayout from "@/components/layout/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminProducts from "./pages/admin/AdminProducts";
@@ -50,6 +51,7 @@ const App = () => (
           </Route>
 
           <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin/redefinir-senha" element={<AdminResetPassword />} />
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="produtos" element={<AdminProducts />} />
