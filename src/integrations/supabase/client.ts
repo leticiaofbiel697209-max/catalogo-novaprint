@@ -2,9 +2,15 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+// Prefer hosting environment variables. The fallback values below are the
+// project's public frontend Supabase configuration (URL + anon/publishable key),
+// never a service-role/secret key. This keeps authentication working on hosts
+// where Vite env vars were not configured during the build.
+const PUBLIC_SUPABASE_URL = 'https://eovrsgaakquemjikzxti.supabase.co';
+const PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvdnJzZ2Fha3F1ZW1qaWt6eHRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI2NDcxNzcsImV4cCI6MjA5ODIyMzE3N30.lbDjEyRPFIoWRSvqLWaFNdfJ3TRG-dD6_3XKF2Mp_i0';
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || PUBLIC_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 function isNewSupabaseApiKey(value: string): boolean {
   return value.startsWith('sb_publishable_') || value.startsWith('sb_secret_');
