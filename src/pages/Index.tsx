@@ -99,7 +99,7 @@ const Index = () => {
           <div className="hidden md:block">
             <div className="aspect-square rounded-2xl bg-transparent border border-white/20 p-2 grid place-items-center overflow-hidden">
               <img
-                src="/novaprint-logo-transparent.svg"
+                src="/novaprint-logo-oficial.png"
                 alt="NovaPrint Brasil"
                 className="h-full w-full object-contain"
               />
