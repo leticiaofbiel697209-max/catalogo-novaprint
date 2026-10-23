@@ -6,7 +6,6 @@ import { useCart } from "@/store/cart";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import logo from "@/assets/novaprint-logo.png.asset.json";
 
 export default function PublicLayout() {
   const count = useCart((s) => s.count());
@@ -40,7 +39,7 @@ export default function PublicLayout() {
       <header className="sticky top-0 z-40 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="container-page flex h-16 items-center gap-4">
           <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="NovaPrint - Início">
-            <img src={logo.url} alt="NovaPrint Brasil" className="h-10 w-auto" />
+            <img src="/novaprint-logo-oficial.png" alt="NovaPrint Brasil" className="h-10 w-auto" />
           </Link>
 
           <form onSubmit={submitSearch} className="hidden md:flex flex-1 max-w-xl relative">
@@ -118,7 +117,7 @@ export default function PublicLayout() {
 
       <footer className="border-t bg-card mt-12">
         <div className="container-page py-8 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between text-sm text-muted-foreground">
-          <img src={logo.url} alt="NovaPrint Brasil" className="h-9 w-auto" />
+          <img src="/novaprint-logo-oficial.png" alt="NovaPrint Brasil" className="h-9 w-auto" />
           <p>© {new Date().getFullYear()} NovaPrint — Portal de Pedidos</p>
           <Link to="/admin" className="hover:text-primary">Área administrativa</Link>
         </div>
